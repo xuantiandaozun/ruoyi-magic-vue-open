@@ -82,29 +82,18 @@ const totalNumber = computed(() => {
   return typeof props.total === 'string' ? parseInt(props.total) : props.total
 })
 
-// Add a flag to track if this is the first load
-const isFirstLoad = ref(true)
-
 function handleSizeChange(val) {
   if (currentPage.value * val > totalNumber.value) {
     currentPage.value = 1
   }
-  // Only emit if not first load
-  if (!isFirstLoad.value) {
-    emit('pagination', { page: currentPage.value, limit: val })
-  }
-  isFirstLoad.value = false
+  emit('pagination', { page: currentPage.value, limit: val })
   if (props.autoScroll) {
     scrollTo(0, 800)
   }
 }
 
 function handleCurrentChange(val) {
-  // Only emit if not first load
-  if (!isFirstLoad.value) {
-    emit('pagination', { page: val, limit: pageSize.value })
-  }
-  isFirstLoad.value = false
+  emit('pagination', { page: val, limit: pageSize.value })
   if (props.autoScroll) {
     scrollTo(0, 800)
   }

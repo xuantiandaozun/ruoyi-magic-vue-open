@@ -200,6 +200,217 @@
   }
 }
 
+// 通用搜索表单样式
+.flexible-search-form {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  align-items: flex-start;
+  
+  /* 当一行空间不足时，搜索按钮会自动换行 */
+  &::after {
+    content: '';
+    flex: 1;
+    min-width: 200px;
+  }
+  
+  .search-item {
+    margin-right: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    
+    /* 基础宽度设置 */
+    @media (min-width: 1600px) {
+      min-width: 280px;
+    }
+    
+    @media (max-width: 1599px) {
+      min-width: 250px;
+    }
+    
+    @media (max-width: 1399px) {
+      min-width: 220px;
+    }
+    
+    @media (max-width: 1199px) {
+      min-width: 200px;
+    }
+    
+    /* 确保标签文本不会被截断 */
+    :deep(.el-form-item__label) {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-right: 5px;
+    }
+    
+    /* 确保输入框占据剩余空间 */
+    :deep(.el-form-item__content) {
+      flex: 1;
+      min-width: 0; /* 防止flex子项溢出 */
+    }
+    
+    /* 输入框样式调整 */
+    :deep(.el-input),
+    :deep(.el-select),
+    :deep(.el-date-editor) {
+      width: 100%;
+    }
+  }
+  
+  /* 日期范围选择器需要更宽的空间 */
+  .date-range-item {
+    @media (min-width: 1400px) {
+      min-width: 380px;
+    }
+    
+    @media (max-width: 1399px) {
+      min-width: 350px;
+    }
+    
+    @media (max-width: 1199px) {
+      min-width: 320px;
+    }
+  }
+  
+  /* 搜索和重置按钮样式 */
+  .search-buttons {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: flex-start;
+    min-width: 200px;
+    flex-shrink: 0;
+    
+    /* 当空间不足时，按钮组会换行到新的一行 */
+    @media (min-width: 769px) {
+      margin-left: 10px;
+    }
+    
+    @media (max-width: 768px) {
+      width: 100%;
+      justify-content: flex-end;
+      margin-left: 0;
+    }
+    
+    .el-button {
+      margin-right: 8px;
+      
+      &:last-child {
+        margin-right: 0;
+      }
+    }
+  }
+}
+
+/* 编辑弹窗样式优化 */
+:deep(.custom-dialog) {
+  .el-dialog {
+    width: auto !important;
+    min-width: 500px;
+    max-width: 80vw;
+  }
+  
+  /* 弹窗整体样式 */
+  .el-dialog__header {
+    padding: 20px 20px 10px;
+    margin-right: 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .el-dialog__body {
+    padding: 20px 20px 10px;
+    max-height: 60vh;
+    overflow-y: auto;
+    width: fit-content;
+    min-width: 460px;
+    max-width: 600px;
+  }
+  
+  .el-dialog__footer {
+    padding: 10px 20px 20px;
+    border-top: 1px solid #f0f0f0;
+  }
+  
+  /* 表单样式优化 */
+  .dialog-form {
+    .el-form-item {
+      margin-bottom: 22px;
+      display: flex;
+      align-items: flex-start;
+      
+      .el-form-item__label {
+        font-weight: 500;
+        color: #333;
+        text-align: left;
+        justify-content: flex-start;
+        min-width: 80px;
+        max-width: 120px;
+        width: auto;
+        padding-right: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-shrink: 0;
+        
+        /* 长标签名自适应 */
+        &[title] {
+          cursor: help;
+        }
+      }
+      
+      .el-form-item__content {
+        flex: 1;
+        min-width: 0;
+        max-width: 250px;
+        
+        .el-input, .el-select, .el-date-editor {
+          width: 100%;
+          max-width: 230px;
+        }
+        
+        .el-textarea {
+          max-width: 230px;
+        }
+        
+        .el-input__wrapper, .el-textarea__inner {
+          box-shadow: 0 0 0 1px #dcdfe6 inset;
+          transition: box-shadow 0.2s;
+          
+          &:hover, &:focus {
+            box-shadow: 0 0 0 1px #409eff inset;
+          }
+        }
+      }
+      
+      /* 响应式调整 */
+      @media (max-width: 768px) {
+        flex-direction: column;
+        
+        .el-form-item__label {
+          max-width: none;
+          width: 100%;
+          margin-bottom: 8px;
+        }
+      }
+    }
+  }
+  
+  /* 弹窗按钮样式 */
+  .dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+    
+    .el-button {
+      padding: 9px 20px;
+      font-weight: 500;
+      border-radius: 4px;
+      margin-left: 10px;
+    }
+  }
+}
+
 // 弹出确认框增强
 .el-message-box {
   border-radius: 8px;

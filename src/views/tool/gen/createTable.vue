@@ -23,7 +23,8 @@
   </el-dialog>
 
   <!-- AI生成状态弹窗 -->
-  <el-dialog title="AI智能建表" v-model="statusVisible" width="500px" top="20vh" append-to-body :close-on-click-modal="false" :close-on-press-escape="false">
+  <el-dialog title="AI智能建表" v-model="statusVisible" width="500px" top="20vh" append-to-body
+    :close-on-click-modal="false" :close-on-press-escape="false">
     <div class="status-container">
       <div class="status-icon">
         <el-icon v-if="taskStatus === 'WAITING'" class="loading-icon" size="48" color="#409EFF">
@@ -45,7 +46,23 @@
         <h3 v-else-if="taskStatus === 'SUCCESS'">生成成功！</h3>
         <h3 v-else-if="taskStatus === 'FAILED'">生成失败</h3>
         <p v-if="taskStatus === 'WAITING'" class="status-desc">任务已提交，正在等待处理</p>
-        <p v-else-if="taskStatus === 'RUNNING'" class="status-desc">AI正在分析需求并生成表结构，请稍候...</p>
+        <p v-else-if="taskStatus === 'RUNNING'" class="status-desc">
+          <span v-if="extraInfo && extraInfo.currentAction">
+            <template v-if="extraInfo.currentAction === '创建表定义'">
+              正在{{ extraInfo.currentAction }}：{{ extraInfo.tableName }} ({{ extraInfo.tableComment }})
+            </template>
+            <template v-else-if="extraInfo.currentAction === '创建表结构'">
+              正在{{ extraInfo.currentAction }}：{{ extraInfo.tableName }}，共{{ extraInfo.fieldCount }}个字段
+            </template>
+            <template v-else-if="extraInfo.currentAction === '同步表到数据库'">
+              正在{{ extraInfo.currentAction }}：{{ extraInfo.tableName }}
+            </template>
+            <template v-else>
+              {{ extraInfo.currentAction }}
+            </template>
+          </span>
+          <span v-else>AI正在分析需求并生成表结构，请稍候...</span>
+        </p>
         <p v-else-if="taskStatus === 'SUCCESS'" class="status-desc">表结构已成功生成，即将跳转到代码生成页面</p>
         <p v-else-if="taskStatus === 'FAILED'" class="status-desc">{{ errorMessage || '生成过程中出现错误，请重试' }}</p>
       </div>
@@ -69,6 +86,7 @@ const taskStatus = ref('');
 const taskId = ref('');
 const errorMessage = ref('');
 const pollTimer = ref(null);
+const extraInfo = ref(null); // 添加extraInfo变量，用于存储任务扩展信息
 const { proxy } = getCurrentInstance();
 const router = useRouter();
 
@@ -125,7 +143,7 @@ function handleSubmit() {
         packageName: "com.ruoyi." + form.value.packageName,
         moduleName: form.value.moduleName
       };
-      
+
       aiDirectTableAsync(data).then(res => {
         // 关闭当前弹窗
         visible.value = false;
@@ -165,7 +183,7 @@ function startPolling() {
   if (pollTimer.value) {
     clearInterval(pollTimer.value);
   }
-  
+
   pollTimer.value = setInterval(() => {
     checkTaskStatus();
   }, 2000); // 每2秒轮询一次
@@ -182,11 +200,21 @@ function stopPolling() {
 /** 检查任务状态 */
 function checkTaskStatus() {
   if (!taskId.value) return;
-  
-  getAsyncTaskStatus(taskId.value).then(res => {
-    const status = res.status;
+
+  getAsyncTaskStatus(taskId.value).then(data => {
+    const { status, errorMessage: errorMsg, extraInfo: taskExtraInfo, result } = data;
     taskStatus.value = status;
-    
+
+    // 更新extraInfo变量 - 解析JSON字符串为对象
+    if (taskExtraInfo) {
+      try {
+        extraInfo.value = typeof taskExtraInfo === 'string' ? JSON.parse(taskExtraInfo) : taskExtraInfo;
+      } catch (e) {
+        console.error('解析extraInfo失败:', e);
+        extraInfo.value = null;
+      }
+    }
+
     if (status === 'SUCCESS') {
       stopPolling();
       // 延迟1秒后关闭弹窗并触发刷新
@@ -197,7 +225,7 @@ function checkTaskStatus() {
       }, 1000);
     } else if (status === 'FAILED') {
       stopPolling();
-      errorMessage.value = res.errorMessage || '任务执行失败';
+      errorMessage.value = errorMsg || '生成过程中出现错误，请重试';
     }
     // WAITING 和 RUNNING 状态继续轮询
   }).catch(error => {
@@ -206,6 +234,7 @@ function checkTaskStatus() {
     errorMessage.value = '查询任务状态失败：' + error.message;
   });
 }
+
 
 // 组件销毁时清理定时器
 onBeforeUnmount(() => {
@@ -243,6 +272,7 @@ defineExpose({
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }

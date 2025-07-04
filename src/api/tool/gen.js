@@ -156,3 +156,20 @@ export function execPermissionSql(tableId) {
     method: 'post'
   })
 }
+
+// AI优化表字段
+export function aiOptimizeColumns(tableId) {
+  return request({
+    url: '/tool/gen/aiOptimizeColumns/' + tableId,
+    method: 'post',
+    timeout: 120000  // 设置超时时间为 120 秒
+  })
+}
+
+// AI优化表字段异步接口
+export function aiOptimizeColumnsAsync(tableId) {
+  return request({
+    url: '/tool/gen/aiOptimizeColumnsAsync/' + tableId,
+    method: 'post'
+  })
+}
