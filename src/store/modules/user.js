@@ -40,7 +40,9 @@ const useUserStore = defineStore(
             const user = res.user
             let avatar = user.avatar || ""
             if (!isHttp(avatar)) {
-              avatar = (isEmpty(avatar)) ? defAva : import.meta.env.VITE_APP_BASE_API + avatar
+              // 添加时间戳参数，避免浏览器缓存
+              const timestamp = new Date().getTime();
+              avatar = (isEmpty(avatar)) ? defAva : import.meta.env.VITE_APP_BASE_API + avatar + '?t=' + timestamp
             }
 
             console.log('roles:{}', user.roles)

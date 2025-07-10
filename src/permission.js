@@ -17,6 +17,12 @@ const isWhiteList = (path) => {
   return whiteList.some(pattern => isPathMatch(pattern, path))
 }
 
+// 获取登录路径
+const getLoginPath = (redirect = '') => {
+  const baseUrl = import.meta.env.VITE_APP_ENV === 'production' ? '/admin' : '';
+  return `${baseUrl}/login${redirect ? `?redirect=${redirect}` : ''}`;
+};
+
 router.beforeEach((to, from, next) => {
   NProgress.start()
   if (getToken()) {
@@ -43,12 +49,12 @@ router.beforeEach((to, from, next) => {
             })
           }).catch(err => {
             removeToken()
-            next(`/login?redirect=${to.fullPath}`)
+            next(getLoginPath(to.fullPath))
             NProgress.done()
           })
         } catch (error) {
           removeToken()
-          next(`/login?redirect=${to.fullPath}`)
+          next(getLoginPath(to.fullPath))
           NProgress.done()
         }
       } else {
@@ -61,7 +67,7 @@ router.beforeEach((to, from, next) => {
       // 在免登录白名单，直接进入
       next()
     } else {
-      next(`/login?redirect=${to.fullPath}`) // 否则全部重定向到登录页
+      next(getLoginPath(to.fullPath)) // 否则全部重定向到登录页
       NProgress.done()
     }
   }

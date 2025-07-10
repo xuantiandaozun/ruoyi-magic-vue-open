@@ -127,17 +127,21 @@ service.interceptors.response.use(res => {
     if (code === 401) {
       if (!isRelogin.show) {
         isRelogin.show = true;
-        ElMessageBox.confirm('登录状态已过期，您可以继续留在该页面，或者重新登录', '系统提示', { 
-          confirmButtonText: '重新登录', 
-          cancelButtonText: '取消', 
-          type: 'warning' 
-        }).then(() => {
-          isRelogin.show = false;
-          useUserStore().$reset();
-          removeToken();
-          location.reload();
-        }).catch(() => {
-          isRelogin.show = false;
+        ElMessage({
+          message: '登录状态已过期，正在跳转到登录页面',
+          type: 'warning',
+          duration: 2000,
+          onClose: () => {
+            isRelogin.show = false;
+            useUserStore().$reset();
+            removeToken();
+            // 获取登录路径
+            const getLoginPath = () => {
+              const baseUrl = import.meta.env.VITE_APP_ENV === 'production' ? '/admin' : '';
+              return `${baseUrl}/login`;
+            };
+            location.href = getLoginPath();
+          }
         });
       }
       return Promise.reject('无效的会话，或者会话已过期，请重新登录。')
@@ -161,6 +165,28 @@ service.interceptors.response.use(res => {
     if (isLoading) {
       hideLoading();
     }
+    
+    // 处理401错误，显示提示并跳转到登录页面
+    if (error.response && error.response.status === 401) {
+      if (!isRelogin.show) {
+        isRelogin.show = true;
+        ElMessage({
+          message: '登录状态已过期，正在跳转到登录页面',
+          type: 'warning',
+          duration: 2000,
+          onClose: () => {
+            isRelogin.show = false;
+            useUserStore().$reset();
+            removeToken();
+            // 根据环境变量添加正确的基础路径
+            const baseUrl = import.meta.env.VITE_APP_ENV === 'production' ? '/admin' : '';
+            location.href = `${baseUrl}/login`;
+          }
+        });
+      }
+      return Promise.reject('无效的会话，或者会话已过期，请重新登录。');
+    }
+    
     let { message } = error;
     if (message == "Network Error") {
       message = "后端接口连接异常";

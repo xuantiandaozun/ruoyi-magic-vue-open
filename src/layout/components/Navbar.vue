@@ -26,7 +26,7 @@
       <div class="avatar-container">
         <el-dropdown @command="handleCommand" class="right-menu-item hover-effect" trigger="click">
           <div class="avatar-wrapper">
-            <img :src="userStore.avatar" class="user-avatar" />
+            <img :src="userStore.avatar" class="user-avatar" :key="userStore.avatar" />
             <el-icon><caret-bottom /></el-icon>
           </div>
           <template #dropdown>
@@ -81,6 +81,12 @@ function handleCommand(command) {
   }
 }
 
+// 计算登录路径，根据环境变量添加正确的基础路径
+const getLoginPath = () => {
+  const baseUrl = import.meta.env.VITE_APP_ENV === 'production' ? '/admin' : '';
+  return `${baseUrl}/login`;
+};
+
 function logout() {
   ElMessageBox.confirm('确定注销并退出系统吗？', '提示', {
     confirmButtonText: '确定',
@@ -88,7 +94,7 @@ function logout() {
     type: 'warning'
   }).then(() => {
     userStore.logOut().then(() => {
-      location.href = '/index';
+      location.href = getLoginPath();
     })
   }).catch(() => { });
 }

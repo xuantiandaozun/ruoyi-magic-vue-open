@@ -133,10 +133,44 @@ function uploadImg() {
     formData.append("avatarfile", data, options.filename);
     uploadAvatar(formData).then(response => {
       open.value = false;
-      options.img = import.meta.env.VITE_APP_BASE_API + response.imgUrl;
-      userStore.avatar = options.img;
-      proxy.$modal.msgSuccess("修改成功");
+      
+      // 检查响应数据是否有效
+      console.log('Upload response:', response); // 调试日志
+      
+      // 根据request.js的响应拦截器，response直接是data部分
+      if (response) {
+        // 根据实际响应结构获取图片URL，可能是imgUrl或fileName
+        const imageUrl = response;
+        
+        if (imageUrl) {
+          // 添加时间戳参数，避免浏览器缓存
+          const timestamp = new Date().getTime();
+          const newAvatarUrl = import.meta.env.VITE_APP_BASE_API + imageUrl + '?t=' + timestamp;
+          
+          // 更新本地显示的头像
+          options.img = newAvatarUrl;
+          // 更新store中的头像
+          userStore.avatar = newAvatarUrl;
+          
+          // 刷新用户信息，确保头像更新后的数据同步
+          userStore.getInfo();
+          
+          proxy.$modal.msgSuccess("修改成功");
+        } else {
+          proxy.$modal.msgError("头像上传失败，服务器未返回图片地址");
+          console.error('No image URL in response:', response);
+        }
+      } else {
+        proxy.$modal.msgError("头像上传失败，服务器返回数据为空");
+        console.error('Upload response is null or undefined:', response);
+      }
+      
       visible.value = false;
+    }).catch(error => {
+      open.value = false;
+      visible.value = false;
+      proxy.$modal.msgError("头像上传失败: " + (error.message || '未知错误'));
+      console.error('Upload error:', error);
     });
   });
 }

@@ -64,7 +64,7 @@
           <span v-else>注 册 中...</span>
         </el-button>
         <div style="float: right;">
-          <router-link class="link-type" :to="'/login'">使用已有账户登录</router-link>
+          <router-link class="link-type" :to="loginPath">使用已有账户登录</router-link>
         </div>
       </el-form-item>
     </el-form>
@@ -78,6 +78,13 @@
 <script setup>
 import { ElMessageBox } from "element-plus";
 import { getCodeImg, register } from "@/api/login";
+import { computed } from 'vue';
+
+// 计算登录路径，根据环境变量添加正确的基础路径
+const loginPath = computed(() => {
+  const baseUrl = import.meta.env.VITE_APP_ENV === 'production' ? '/admin' : '';
+  return `${baseUrl}/login`;
+});
 
 const router = useRouter();
 const { proxy } = getCurrentInstance();
@@ -129,7 +136,7 @@ function handleRegister() {
           dangerouslyUseHTMLString: true,
           type: "success",
         }).then(() => {
-          router.push("/login");
+          router.push(loginPath.value);
         }).catch(() => {});
       }).catch(() => {
         loading.value = false;
