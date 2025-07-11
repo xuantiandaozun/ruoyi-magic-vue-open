@@ -90,6 +90,14 @@ function editCropper() {
 
 /** 打开弹出层结束时的回调 */
 function modalOpened() {
+  // 如果当前头像是外部链接（如OSS），暂时清空img避免CORS错误
+  // 用户需要重新选择图片进行裁剪
+  if (options.img && (options.img.startsWith('http://') || options.img.startsWith('https://'))) {
+    // 保存原始头像URL
+    options.originalImg = options.img;
+    // 清空img，避免VueCropper加载外部图片时出现CORS错误
+    options.img = '';
+  }
   visible.value = true;
 }
 
@@ -134,9 +142,6 @@ function uploadImg() {
     uploadAvatar(formData).then(response => {
       open.value = false;
       
-      // 检查响应数据是否有效
-      console.log('Upload response:', response); // 调试日志
-      
       // 根据request.js的响应拦截器，response直接是data部分
       if (response) {
         // 根据实际响应结构获取图片URL，可能是imgUrl或fileName
@@ -145,7 +150,9 @@ function uploadImg() {
         if (imageUrl) {
           // 添加时间戳参数，避免浏览器缓存
           const timestamp = new Date().getTime();
-          const newAvatarUrl = import.meta.env.VITE_APP_BASE_API + imageUrl + '?t=' + timestamp;
+          // 判断是否为完整路径，如果是完整路径就直接使用，否则拼接BASE_API
+          const isFullPath = imageUrl.startsWith('http://') || imageUrl.startsWith('https://');
+          const newAvatarUrl = isFullPath ? imageUrl + '?t=' + timestamp : import.meta.env.VITE_APP_BASE_API + imageUrl + '?t=' + timestamp;
           
           // 更新本地显示的头像
           options.img = newAvatarUrl;
@@ -182,8 +189,13 @@ function realTime(data) {
 
 /** 关闭窗口 */
 function closeDialog() {
-  options.img = userStore.avatar;
-  options.visible = false;
+  // 恢复原始头像URL
+  options.img = options.originalImg || userStore.avatar;
+  // 清理临时保存的原始图片URL
+  if (options.originalImg) {
+    delete options.originalImg;
+  }
+  visible.value = false;
 }
 </script>
 
