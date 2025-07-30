@@ -36,6 +36,13 @@ const usePermissionStore = defineStore(
         return new Promise(resolve => {
           // 向后端请求路由数据
           getRouters().then(res => {
+            // 确保返回的数据是有效的数组
+            if (!res || !Array.isArray(res)) {
+              console.warn('Invalid route data received from server:', res)
+              resolve([])
+              return
+            }
+            
             const sdata = JSON.parse(JSON.stringify(res))
             const rdata = JSON.parse(JSON.stringify(res))
             const defaultData = JSON.parse(JSON.stringify(res))
@@ -47,8 +54,10 @@ const usePermissionStore = defineStore(
             // 清除所有动态路由
             let removeRoutes = []
             asyncRoutes.forEach(route => { 
-              const routeObj = router.addRoute(route)
-              removeRoutes.push(routeObj)
+              if (route && route.path) {
+                const routeObj = router.addRoute(route)
+                removeRoutes.push(routeObj)
+              }
             })
             
             this.setRoutes(rewriteRoutes)
@@ -57,6 +66,7 @@ const usePermissionStore = defineStore(
             this.setTopbarRoutes(defaultRoutes)
             resolve(rewriteRoutes)
           }).catch(error => {
+            console.error('Error fetching routes:', error)
             resolve([])
           })
         })
@@ -67,6 +77,11 @@ const usePermissionStore = defineStore(
 // 遍历后台传来的路由字符串，转换为组件对象
 function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
   return asyncRouterMap.filter(route => {
+    // 确保路由对象有效且包含必要的属性
+    if (!route || !route.path) {
+      return false
+    }
+    
     if (type && route.children) {
       route.children = filterChildren(route.children)
     }
@@ -79,7 +94,12 @@ function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
       } else if (route.component === 'InnerLink') {
         route.component = InnerLink
       } else {
-        route.component = loadView(route.component)
+        const loadedComponent = loadView(route.component)
+        if (!loadedComponent) {
+          console.warn(`Component not found for route: ${route.path}, component: ${route.component}`)
+          return false
+        }
+        route.component = loadedComponent
       }
     }
     if (route.children != null && route.children && route.children.length) {
@@ -95,20 +115,27 @@ function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
 function filterChildren(childrenMap, lastRouter = false) {
   var children = []
   childrenMap.forEach((el, index) => {
+    // 确保子路由对象有效
+    if (!el || !el.path) {
+      return
+    }
+    
     if (el.children && el.children.length) {
       if (el.component === 'ParentView' && !lastRouter) {
         el.children.forEach(c => {
-          c.path = el.path + '/' + c.path
-          if (c.children && c.children.length) {
-            children = children.concat(filterChildren(c.children, c))
-            return
+          if (c && c.path) {
+            c.path = el.path + '/' + c.path
+            if (c.children && c.children.length) {
+              children = children.concat(filterChildren(c.children, c))
+              return
+            }
+            children.push(c)
           }
-          children.push(c)
         })
         return
       }
     }
-    if (lastRouter) {
+    if (lastRouter && lastRouter.path) {
       el.path = lastRouter.path + '/' + el.path
       if (el.children && el.children.length) {
         children = children.concat(filterChildren(el.children, el))

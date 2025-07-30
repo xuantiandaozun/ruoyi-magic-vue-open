@@ -9,7 +9,8 @@
     "dev": "vite",
     "build:prod": "vite build",
     "build:stage": "vite build --mode staging",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build:prod && node deploy/index.js"
   },
   "repository": {
     "type": "git",
@@ -20,6 +21,7 @@
     "@vueup/vue-quill": "1.2.0",
     "@vueuse/core": "10.11.0",
     "axios": "0.28.1",
+    "chalk": "^5.4.1",
     "clipboard": "2.0.11",
     "echarts": "5.5.1",
     "element-plus": "2.7.6",
@@ -29,7 +31,9 @@
     "js-cookie": "3.0.5",
     "jsencrypt": "3.3.2",
     "nprogress": "0.2.0",
+    "ora": "^8.2.0",
     "pinia": "2.1.7",
+    "scp2": "^0.5.0",
     "splitpanes": "3.1.5",
     "vue": "3.4.31",
     "vue-cropper": "1.1.1",

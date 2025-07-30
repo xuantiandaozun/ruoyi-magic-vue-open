@@ -91,44 +91,41 @@
               <el-icon><question-filled /></el-icon>
             </el-tooltip>
           </template>
-          <el-tree-select
-            v-model="info.parentMenuId"
-            :data="menuOptions"
-            :props="{ value: 'menuId', label: 'menuName', children: 'children' }"
-            value-key="menuId"
-            placeholder="请选择系统菜单"
-            check-strictly
-          />
+          <el-tree-select v-model="info.parentMenuId" :data="menuOptions"
+            :props="{ value: 'menuId', label: 'menuName', children: 'children' }" value-key="menuId"
+            placeholder="请选择系统菜单" check-strictly />
         </el-form-item>
       </el-col>
 
       <el-col :span="24" v-if="info.genType == '1'">
-        <el-form-item prop="genPath">
-          <template #label>
-            自定义路径
-            <el-tooltip content="填写磁盘绝对路径，若不填写，则生成到当前Web项目下" placement="top">
-              <el-icon><question-filled /></el-icon>
-            </el-tooltip>
-          </template>
-          <el-input v-model="info.genPath">
+        <!-- Java代码路径 -->
+        <el-form-item prop="genPath" label="Java代码路径">
+          <el-input v-model="info.genPath" placeholder="请选择Java代码生成路径">
             <template #append>
-              <el-dropdown>
-                <el-button type="primary">
-                  最近路径快速选择
-                  <i class="el-icon-arrow-down el-icon--right"></i>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="info.genPath = '/'">恢复默认的生成基础路径</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <el-button @click="selectJavaPath">
+                <el-icon>
+                  <Folder />
+                </el-icon>
+              </el-button>
+            </template>
+          </el-input>
+        </el-form-item>
+
+        <!-- Vue代码路径 -->
+        <el-form-item prop="vuePath" label="Vue代码路径">
+          <el-input v-model="info.vuePath" placeholder="请选择Vue代码生成路径">
+            <template #append>
+              <el-button @click="selectVuePath">
+                <el-icon>
+                  <Folder />
+                </el-icon>
+              </el-button>
             </template>
           </el-input>
         </el-form-item>
       </el-col>
     </el-row>
-    
+
     <template v-if="info.tplCategory == 'tree'">
       <h4 class="form-header">其他信息</h4>
       <el-row v-show="info.tplCategory == 'tree'">
@@ -141,12 +138,8 @@
               </el-tooltip>
             </template>
             <el-select v-model="info.treeCode" placeholder="请选择">
-              <el-option
-                v-for="(column, index) in info.columns"
-                :key="index"
-                :label="column.columnName + '：' + column.columnComment"
-                :value="column.columnName"
-              ></el-option>
+              <el-option v-for="(column, index) in info.columns" :key="index"
+                :label="column.columnName + '：' + column.columnComment" :value="column.columnName"></el-option>
             </el-select>
           </el-form-item>
         </el-col>
@@ -159,12 +152,8 @@
               </el-tooltip>
             </template>
             <el-select v-model="info.treeParentCode" placeholder="请选择">
-              <el-option
-                v-for="(column, index) in info.columns"
-                :key="index"
-                :label="column.columnName + '：' + column.columnComment"
-                :value="column.columnName"
-              ></el-option>
+              <el-option v-for="(column, index) in info.columns" :key="index"
+                :label="column.columnName + '：' + column.columnComment" :value="column.columnName"></el-option>
             </el-select>
           </el-form-item>
         </el-col>
@@ -177,12 +166,8 @@
               </el-tooltip>
             </template>
             <el-select v-model="info.treeName" placeholder="请选择">
-              <el-option
-                v-for="(column, index) in info.columns"
-                :key="index"
-                :label="column.columnName + '：' + column.columnComment"
-                :value="column.columnName"
-              ></el-option>
+              <el-option v-for="(column, index) in info.columns" :key="index"
+                :label="column.columnName + '：' + column.columnComment" :value="column.columnName"></el-option>
             </el-select>
           </el-form-item>
         </el-col>
@@ -201,12 +186,8 @@
               </el-tooltip>
             </template>
             <el-select v-model="info.subTableName" placeholder="请选择" @change="subSelectChange">
-              <el-option
-                v-for="(table, index) in tables"
-                :key="index"
-                :label="table.tableName + '：' + table.tableComment"
-                :value="table.tableName"
-              ></el-option>
+              <el-option v-for="(table, index) in tables" :key="index"
+                :label="table.tableName + '：' + table.tableComment" :value="table.tableName"></el-option>
             </el-select>
           </el-form-item>
         </el-col>
@@ -219,12 +200,8 @@
               </el-tooltip>
             </template>
             <el-select v-model="info.subTableFkName" placeholder="请选择">
-              <el-option
-                v-for="(column, index) in subColumns"
-                :key="index"
-                :label="column.columnName + '：' + column.columnComment"
-                :value="column.columnName"
-              ></el-option>
+              <el-option v-for="(column, index) in subColumns" :key="index"
+                :label="column.columnName + '：' + column.columnComment" :value="column.columnName"></el-option>
             </el-select>
           </el-form-item>
         </el-col>
@@ -232,10 +209,18 @@
     </template>
 
   </el-form>
+
+  <!-- Java路径选择器 -->
+  <DirectorySelector v-model="showJavaPathSelector" title="选择Java代码生成路径" @confirm="handleJavaPathConfirm" />
+
+  <!-- Vue路径选择器 -->
+  <DirectorySelector v-model="showVuePathSelector" title="选择Vue代码生成路径" @confirm="handleVuePathConfirm" />
 </template>
 
 <script setup>
+import { ref, watch, getCurrentInstance, onMounted } from 'vue';
 import { listMenu } from "@/api/system/menu";
+import DirectorySelector from "@/components/DirectorySelector/index.vue";
 
 const subColumns = ref([]);
 const menuOptions = ref([]);
@@ -263,6 +248,7 @@ const rules = ref({
 
 function subSelectChange(value) {
   props.info.subTableFkName = "";
+  setSubTableColumns(value);
 }
 
 function tplSelectChange(value) {
@@ -273,10 +259,10 @@ function tplSelectChange(value) {
 }
 
 function setSubTableColumns(value) {
-  for (var item in props.tables) {
-    const name = props.tables[item].tableName;
-    if (value === name) {
-      subColumns.value = props.tables[item].columns;
+  for (let i = 0; i < props.tables.length; i++) {
+    const table = props.tables[i];
+    if (value === table.tableName) {
+      subColumns.value = table.columns;
       break;
     }
   }
@@ -287,6 +273,32 @@ function getMenuTreeselect() {
   listMenu().then(data => {
     menuOptions.value = proxy.handleTree(data, "menuId");
   });
+}
+
+// 目录选择器相关状态
+const showJavaPathSelector = ref(false);
+const showVuePathSelector = ref(false);
+
+/** 选择Java代码路径 */
+function selectJavaPath() {
+  showJavaPathSelector.value = true;
+}
+
+/** 选择Vue代码路径 */
+function selectVuePath() {
+  showVuePathSelector.value = true;
+}
+
+/** 确认选择Java路径 */
+function handleJavaPathConfirm(path) {
+  props.info.genPath = path;
+  showJavaPathSelector.value = false;
+}
+
+/** 确认选择Vue路径 */
+function handleVuePathConfirm(path) {
+  props.info.vuePath = path;
+  showVuePathSelector.value = false;
 }
 
 onMounted(() => {

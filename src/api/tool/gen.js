@@ -173,3 +173,75 @@ export function aiOptimizeColumnsAsync(tableId) {
     method: 'post'
   })
 }
+
+// 修改单个表字段
+export function updateGenTableColumn(data) {
+  return request({
+    url: '/tool/gen/column',
+    method: 'put',
+    data: data
+  })
+}
+
+// 获取目录列表
+export function getDirectories(path) {
+  return request({
+    url: '/tool/gen/directories',
+    method: 'get',
+    params: { path }
+  })
+}
+
+// 获取常用路径
+export function getCommonPaths() {
+  return request({
+    url: '/tool/gen/commonPaths',
+    method: 'get'
+  })
+}
+
+// 验证路径有效性
+export function validatePath(path) {
+  return request({
+    url: '/tool/gen/validatePath',
+    method: 'post',
+    data: { path }
+  })
+}
+
+// 批量修改代码生成信息
+export function batchUpdateGenTable(data) {
+  return request({
+    url: '/tool/gen/batchUpdate',
+    method: 'put',
+    data: data
+  })
+}
+
+// 批量生成代码到自定义路径
+export function batchGenCode(data) {
+  return request({
+    url: '/tool/gen/batchGenCode',
+    method: 'post',
+    data: data
+  })
+}
+
+// 批量下载代码
+export function batchDownload(data) {
+  return request({
+    url: '/tool/gen/batchDownload',
+    method: 'post',
+    data: data,
+    responseType: 'blob'
+  })
+}
+
+// 从数据库同步指定表
+export function syncTableFromDb(data) {
+  return request({
+    url: '/tool/gen/syncTableFromDb',
+    method: 'post',
+    data: data
+  })
+}
