@@ -82,6 +82,14 @@
           v-hasPermi="['system:rdsInstance:export']"
         >导出</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="info"
+          plain
+          icon="Refresh"
+          @click="handleSyncAliyun"
+        >同步阿里云RDS实例</el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -275,8 +283,8 @@
 </template>
 
 <script setup name="RdsInstance">
-import { listRdsInstance, getRdsInstance, delRdsInstance, addRdsInstance, updateRdsInstance } from "@/api/system/rdsInstance";
-import { onMounted, onUnmounted, getCurrentInstance, ref, reactive, toRefs } from 'vue';
+import { addRdsInstance, delRdsInstance, getRdsInstance, listRdsInstance, syncAliyunRdsInstances, updateRdsInstance } from "@/api/system/rdsInstance";
+import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
 // 模板引用
@@ -486,6 +494,25 @@ function handleExport() {
   proxy.download('system/rdsInstance/export', {
     ...queryParams.value
   }, 'rdsInstance_' + new Date().getTime() + '.xlsx')
+}
+
+/** 同步阿里云RDS实例操作 */
+async function handleSyncAliyun() {
+  try {
+    await proxy.$modal.confirm('是否确认同步阿里云RDS实例？此操作将从阿里云获取最新的RDS实例信息。');
+    loading.value = true;
+    await syncAliyunRdsInstances();
+    proxy.$modal.msgSuccess("同步成功");
+    getList(); // 重新加载列表
+  } catch (error) {
+    if (error === 'cancel') {
+      // 用户取消操作，无需提示
+    } else {
+      proxy.$modal.msgError("同步失败：" + error);
+    }
+  } finally {
+    loading.value = false;
+  }
 }
 
 // 在组件挂载后执行查询操作

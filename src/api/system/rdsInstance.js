@@ -42,3 +42,11 @@ export function delRdsInstance(id) {
     method: 'delete'
   })
 }
+
+// 同步阿里云RDS实例
+export function syncAliyunRdsInstances() {
+  return request({
+    url: '/system/rdsInstance/syncAliyun',
+    method: 'post'
+  })
+}

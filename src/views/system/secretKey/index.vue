@@ -84,6 +84,15 @@
           v-hasPermi="['system:secretKey:export']"
         >导出</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="info"
+          plain
+          icon="Refresh"
+          @click="handleSyncAliyunRegions"
+          :loading="syncLoading"
+        >同步阿里云地域</el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -145,7 +154,7 @@
           <el-input v-model="form.providerName" placeholder="请输入厂商名称" />
         </el-form-item>
         <el-form-item label="厂商品牌" prop="providerBrand">
-          <el-select v-model="form.providerBrand" placeholder="请选择厂商品牌">
+          <el-select v-model="form.providerBrand" placeholder="请选择厂商品牌" @change="handleProviderBrandChange">
             <el-option
               v-for="dict in sys_provider_brand"
               :key="dict.value"
@@ -187,7 +196,28 @@
           <el-input v-model="form.scopeName" placeholder="请输入范围名称" />
         </el-form-item>
         <el-form-item label="地域" prop="region">
-          <el-input v-model="form.region" placeholder="请输入地域" />
+          <el-select 
+            v-if="form.providerBrand === 'aliyun'"
+            v-model="form.region" 
+            placeholder="请选择地域" 
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="dict in aliyun_region"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+          <el-input 
+            v-else
+            v-model="form.region" 
+            placeholder="请输入地域" 
+          />
         </el-form-item>
         <el-form-item label="过期时间" prop="expireTime">
           <el-date-picker clearable
@@ -223,18 +253,20 @@
 
 <script setup name="SecretKey">
 import { listSecretKey, getSecretKey, delSecretKey, addSecretKey, updateSecretKey } from "@/api/system/secretKey";
+import { syncAliyunRegions } from "@/api/system/aliyunRegion";
 import { onMounted, onUnmounted, getCurrentInstance, ref, reactive, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
 // 模板引用
 const secretKeyRef = ref();
 const queryRef = ref();
-const { sys_key_type,sys_provider_type,sys_provider_brand,sys_normal_disable,sys_scope_type } = proxy.useDict('sys_key_type','sys_provider_type','sys_provider_brand','sys_normal_disable','sys_scope_type');
+const { sys_key_type,sys_provider_type,sys_provider_brand,sys_normal_disable,sys_scope_type,aliyun_region } = proxy.useDict('sys_key_type','sys_provider_type','sys_provider_brand','sys_normal_disable','sys_scope_type','aliyun_region');
 
 const secretKeyList = ref([]);
 const open = ref(false);
 const loading = ref(true);
 const formLoading = ref(false);
+const syncLoading = ref(false);
 const showSearch = ref(true);
 const ids = ref([]);
 const single = ref(true);
@@ -370,6 +402,12 @@ async function handleUpdate(row) {
   try {
     const response = await getSecretKey(editId);
     form.value = response;
+    
+    // 处理阿里云地域数据格式转换（编辑时回显）
+    if (form.value.providerBrand === 'aliyun' && form.value.region && typeof form.value.region === 'string') {
+      form.value.region = form.value.region.split(',').filter(item => item.trim());
+    }
+    
     open.value = true;
     title.value = "修改密钥管理";
   } catch (error) {
@@ -390,12 +428,17 @@ async function submitForm() {
 
   formLoading.value = true;
   try {
+    // 处理地域数据格式转换
+    const submitData = { ...form.value };
+    if (Array.isArray(submitData.region)) {
+      submitData.region = submitData.region.join(',');
+    }
     
-    if (form.value.id != null) {
-      await updateSecretKey(form.value);
+    if (submitData.id != null) {
+      await updateSecretKey(submitData);
       proxy.$modal.msgSuccess("修改成功");
     } else {
-      await addSecretKey(form.value);
+      await addSecretKey(submitData);
       proxy.$modal.msgSuccess("新增成功");
     }
     open.value = false;
@@ -429,6 +472,25 @@ function handleExport() {
   proxy.download('system/secretKey/export', {
     ...queryParams.value
   }, 'secretKey_' + new Date().getTime() + '.xlsx')
+}
+
+/** 同步阿里云地域按钮操作 */
+async function handleSyncAliyunRegions() {
+  syncLoading.value = true;
+  try {
+    const response = await syncAliyunRegions();
+    proxy.$modal.msgSuccess("阿里云地域同步成功");
+  } catch (error) {
+    proxy.$modal.msgError("同步失败：" + error.message);
+  } finally {
+    syncLoading.value = false;
+  }
+}
+
+// 监听厂商品牌变化，清空地域字段
+function handleProviderBrandChange() {
+  // 当厂商品牌改变时，清空地域字段
+  form.value.region = null;
 }
 
 // 在组件挂载后执行查询操作
