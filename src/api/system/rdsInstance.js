@@ -50,3 +50,36 @@ export function syncAliyunRdsInstances() {
     method: 'post'
   })
 }
+
+// 获取RDS实例连接信息
+export function getRdsInstanceNetInfo(dbInstanceId) {
+  return request({
+    url: '/system/rdsInstance/netInfo/' + dbInstanceId,
+    method: 'get'
+  })
+}
+
+// 获取RDS实例白名单信息
+export function getRdsInstanceIPArrayList(dbInstanceId) {
+  return request({
+    url: '/system/rdsInstance/ipArrayList/' + dbInstanceId,
+    method: 'get'
+  })
+}
+
+// 修改RDS实例白名单
+export function modifyRdsInstanceSecurityIps(dbInstanceId, data) {
+  return request({
+    url: '/system/rdsInstance/modifySecurityIps/' + dbInstanceId,
+    method: 'put',
+    data: data
+  })
+}
+
+// 批量更新所有RDS实例的客户端白名单
+export function updateAllRdsClientWhitelist() {
+  return request({
+    url: '/system/rdsInstance/updateClientWhitelist',
+    method: 'post'
+  })
+}

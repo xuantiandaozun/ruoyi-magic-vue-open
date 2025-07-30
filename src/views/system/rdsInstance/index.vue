@@ -90,6 +90,15 @@
           @click="handleSyncAliyun"
         >同步阿里云RDS实例</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="warning"
+          plain
+          icon="Setting"
+          @click="handleUpdateAllClientWhitelist"
+          v-hasPermi="['system:rdsInstance:edit']"
+        >批量更新客户端白名单</el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -110,6 +119,8 @@
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
+          <el-button link type="primary" icon="View" @click="handleViewNetInfo(scope.row)" v-hasPermi="['system:rdsInstance:query']">连接信息</el-button>
+          <el-button link type="success" icon="List" @click="handleViewIPArrayList(scope.row)" v-hasPermi="['system:rdsInstance:query']">白名单</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:rdsInstance:edit']">修改</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:rdsInstance:remove']">删除</el-button>
         </template>
@@ -149,9 +160,6 @@
         </el-form-item>
         <el-form-item label="实例规格" prop="dbInstanceClass">
           <el-input v-model="form.dbInstanceClass" placeholder="请输入实例规格" />
-        </el-form-item>
-        <el-form-item label="CPU数量" prop="dbInstanceCpu">
-          <el-input v-model="form.dbInstanceCpu" placeholder="请输入CPU数量" />
         </el-form-item>
         <el-form-item label="内存大小" prop="dbInstanceMemory">
           <el-input v-model="form.dbInstanceMemory" placeholder="请输入内存大小" />
@@ -237,27 +245,6 @@
             placeholder="请选择销毁时间">
           </el-date-picker>
         </el-form-item>
-        <el-form-item label="主实例ID" prop="masterInstanceId">
-          <el-input v-model="form.masterInstanceId" placeholder="请输入主实例ID" />
-        </el-form-item>
-        <el-form-item label="灾备实例ID" prop="guardDbInstanceId">
-          <el-input v-model="form.guardDbInstanceId" placeholder="请输入灾备实例ID" />
-        </el-form-item>
-        <el-form-item label="临时实例ID" prop="tempDbInstanceId">
-          <el-input v-model="form.tempDbInstanceId" placeholder="请输入临时实例ID" />
-        </el-form-item>
-        <el-form-item label="关联的密钥表ID" prop="secretKeyId">
-          <el-input v-model="form.secretKeyId" placeholder="请输入关联的密钥表ID" />
-        </el-form-item>
-        <el-form-item label="访问密钥" prop="accessKey">
-          <el-input v-model="form.accessKey" placeholder="请输入访问密钥" />
-        </el-form-item>
-        <el-form-item label="密钥" prop="secretKey">
-          <el-input v-model="form.secretKey" placeholder="请输入密钥" />
-        </el-form-item>
-        <el-form-item label="密钥地域" prop="keyRegion">
-          <el-input v-model="form.keyRegion" placeholder="请输入密钥地域" />
-        </el-form-item>
         <el-form-item label="密钥状态" prop="keyStatus">
           <el-radio-group v-model="form.keyStatus">
             <el-radio
@@ -279,11 +266,178 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 查看RDS连接信息对话框 -->
+    <el-dialog title="RDS连接信息" v-model="netInfoOpen" width="1200px" append-to-body>
+      <div v-loading="netInfoLoading">
+        <div v-if="netInfoData">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="实例ID">{{ currentInstance.dbInstanceId }}</el-descriptions-item>
+            <el-descriptions-item label="实例描述">{{ currentInstance.dbInstanceDescription }}</el-descriptions-item>
+            <el-descriptions-item label="网络类型">{{ netInfoData.instanceNetworkType }}</el-descriptions-item>
+             <el-descriptions-item label="安全组模式">{{ netInfoData.securityIPMode }}</el-descriptions-item>
+          </el-descriptions>
+          
+          <el-divider>连接地址信息</el-divider>
+          
+          <el-table :data="netInfoData.dbinstanceNetInfos?.dbinstanceNetInfo || []" border>
+            <el-table-column label="类型" align="center">
+              <template #default="scope">
+                <el-tag :type="scope.row.iptype === 'Private' ? 'success' : 'warning'">
+                   {{ scope.row.iptype === 'Private' ? '内网' : '公网' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="连接地址" align="center" prop="connectionString">
+              <template #default="scope">
+                <div style="display: flex; align-items: center; justify-content: center;">
+                  <span>{{ scope.row.connectionString }}</span>
+                   <el-button 
+                     type="text" 
+                     icon="CopyDocument" 
+                     @click="copyToClipboard(scope.row.connectionString)"
+                    style="margin-left: 8px;"
+                    title="复制连接地址"
+                  ></el-button>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="端口" align="center" prop="port">
+              <template #default="scope">
+                <div style="display: flex; align-items: center; justify-content: center;">
+                  <span>{{ scope.row.port }}</span>
+                   <el-button 
+                     type="text" 
+                     icon="CopyDocument" 
+                     @click="copyToClipboard(scope.row.port)"
+                    style="margin-left: 8px;"
+                    title="复制端口"
+                  ></el-button>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="IP地址" align="center" prop="ipaddress">
+              <template #default="scope">
+                <div style="display: flex; align-items: center; justify-content: center;">
+                  <span>{{ scope.row.ipaddress }}</span>
+                   <el-button 
+                     type="text" 
+                     icon="CopyDocument" 
+                     @click="copyToClipboard(scope.row.ipaddress)"
+                    style="margin-left: 8px;"
+                    title="复制IP地址"
+                  ></el-button>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="VPC ID" align="center" prop="vpcid" />
+            <el-table-column label="操作" align="center">
+              <template #default="scope">
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  @click="copyConnectionString(scope.row)"
+                >复制完整连接串</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="netInfoOpen = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 查看RDS白名单对话框 -->
+    <el-dialog title="RDS白名单信息" v-model="ipArrayListOpen" width="1200px" append-to-body>
+      <div v-loading="ipArrayListLoading">
+        <div v-if="ipArrayListData">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="实例ID">{{ currentIPArrayInstance.dbInstanceId }}</el-descriptions-item>
+            <el-descriptions-item label="实例描述">{{ currentIPArrayInstance.dbInstanceDescription }}</el-descriptions-item>
+            <el-descriptions-item label="安全组模式">{{ ipArrayListData.securityIPMode }}</el-descriptions-item>
+            <el-descriptions-item label="白名单组数量">{{ (ipArrayListData.items?.dbinstanceIPArray || []).filter(item => item.dbinstanceIPArrayAttribute !== 'hidden').length }}</el-descriptions-item>
+          </el-descriptions>
+          
+          <el-divider>白名单组信息</el-divider>
+          
+          <el-table :data="(ipArrayListData.items?.dbinstanceIPArray || []).filter(item => item.dbinstanceIPArrayAttribute !== 'hidden')" border>
+            <el-table-column label="组名称" align="center" prop="dbinstanceIPArrayName" />
+            <el-table-column label="安全IP列表" align="center" prop="securityIPList">
+              <template #default="scope">
+                <div style="max-width: 300px; word-break: break-all;">
+                  {{ scope.row.securityIPList }}
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" align="center" width="120">
+              <template #default="scope">
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  @click="handleModifySecurityIps(scope.row)"
+                  v-hasPermi="['system:rdsInstance:edit']"
+                >修改</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="ipArrayListOpen = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 修改RDS白名单对话框 -->
+    <el-dialog title="修改RDS白名单" v-model="modifySecurityIpsOpen" width="600px" append-to-body>
+      <div v-loading="modifySecurityIpsLoading">
+        <el-form :model="securityIpsForm" label-width="120px">
+          <el-form-item label="实例ID">
+            <el-input v-model="currentIPArrayInstance.dbInstanceId" disabled />
+          </el-form-item>
+          <el-form-item label="白名单组名称">
+            <el-input v-model="securityIpsForm.dbInstanceIPArrayName" placeholder="默认为default" />
+          </el-form-item>
+          <el-form-item label="安全IP列表" required>
+            <el-input 
+              v-model="securityIpsForm.securityIps" 
+              type="textarea" 
+              :rows="4"
+              placeholder="请输入安全IP列表，多个IP用逗号分隔&#10;支持格式：&#10;- 单个IP：192.168.1.1&#10;- CIDR网段：10.0.0.0/24&#10;- IP范围：192.168.1.1-192.168.1.100&#10;- 多个IP：192.168.1.1,10.0.0.0/24"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-alert
+              title="注意事项"
+              type="warning"
+              :closable="false"
+              show-icon>
+              <template #default>
+                <div>
+                  <p>• 修改白名单会立即生效，可能影响现有连接</p>
+                  <p>• 避免使用 0.0.0.0/0 开放所有IP访问</p>
+                  <p>• 建议只开放必要的IP地址</p>
+                </div>
+              </template>
+            </el-alert>
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="modifySecurityIpsOpen = false">取 消</el-button>
+          <el-button type="primary" @click="submitModifySecurityIps" :loading="modifySecurityIpsLoading">确 定</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="RdsInstance">
-import { addRdsInstance, delRdsInstance, getRdsInstance, listRdsInstance, syncAliyunRdsInstances, updateRdsInstance } from "@/api/system/rdsInstance";
+import { addRdsInstance, delRdsInstance, getRdsInstance, getRdsInstanceNetInfo, getRdsInstanceIPArrayList, modifyRdsInstanceSecurityIps, listRdsInstance, syncAliyunRdsInstances, updateRdsInstance, updateAllRdsClientWhitelist } from "@/api/system/rdsInstance";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
@@ -302,6 +456,24 @@ const single = ref(true);
 const multiple = ref(true);
 const total = ref(0);
 const title = ref("");
+
+// 连接信息相关变量
+const netInfoOpen = ref(false);
+const netInfoLoading = ref(false);
+const netInfoData = ref(null);
+const currentInstance = ref({});
+
+// 白名单相关变量
+const ipArrayListOpen = ref(false);
+const ipArrayListLoading = ref(false);
+const ipArrayListData = ref(null);
+const modifySecurityIpsOpen = ref(false);
+const modifySecurityIpsLoading = ref(false);
+const securityIpsForm = ref({
+  securityIps: '',
+  dbInstanceIPArrayName: 'default'
+});
+const currentIPArrayInstance = ref({});
 
 const data = reactive({
   form: {},
@@ -509,6 +681,120 @@ async function handleSyncAliyun() {
       // 用户取消操作，无需提示
     } else {
       proxy.$modal.msgError("同步失败：" + error);
+    }
+  } finally {
+    loading.value = false;
+  }
+}
+
+/** 查看连接信息操作 */
+async function handleViewNetInfo(row) {
+  try {
+    currentInstance.value = row;
+    netInfoOpen.value = true;
+    netInfoLoading.value = true;
+    netInfoData.value = null;
+    
+    const response = await getRdsInstanceNetInfo(row.dbInstanceId);
+     netInfoData.value = response;
+  } catch (error) {
+    proxy.$modal.msgError("获取连接信息失败：" + error);
+  } finally {
+    netInfoLoading.value = false;
+  }
+}
+
+/** 复制到剪贴板 */
+function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      proxy.$modal.msgSuccess("复制成功");
+    }).catch(() => {
+      proxy.$modal.msgError("复制失败");
+    });
+  } else {
+    // 降级方案
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      proxy.$modal.msgSuccess("复制成功");
+    } catch (err) {
+      proxy.$modal.msgError("复制失败");
+    }
+    document.body.removeChild(textArea);
+  }
+}
+
+/** 复制完整连接串 */
+ function copyConnectionString(netInfo) {
+   const connectionString = `${netInfo.connectionString}:${netInfo.port}`;
+   copyToClipboard(connectionString);
+ }
+
+/** 查看白名单信息操作 */
+async function handleViewIPArrayList(row) {
+  try {
+    currentIPArrayInstance.value = row;
+    ipArrayListOpen.value = true;
+    ipArrayListLoading.value = true;
+    ipArrayListData.value = null;
+    
+    const response = await getRdsInstanceIPArrayList(row.dbInstanceId);
+    ipArrayListData.value = response;
+  } catch (error) {
+    proxy.$modal.msgError("获取白名单信息失败：" + error);
+  } finally {
+    ipArrayListLoading.value = false;
+  }
+}
+
+/** 修改白名单操作 */
+function handleModifySecurityIps(ipArrayRow) {
+  // 设置当前选中的白名单组信息
+  securityIpsForm.value = {
+    securityIps: ipArrayRow.securityIPList || '',
+    dbInstanceIPArrayName: ipArrayRow.dbinstanceIPArrayName || 'default'
+  };
+  modifySecurityIpsOpen.value = true;
+}
+
+/** 提交修改白名单 */
+async function submitModifySecurityIps() {
+  if (!securityIpsForm.value.securityIps.trim()) {
+    proxy.$modal.msgError("安全IP列表不能为空");
+    return;
+  }
+  
+  try {
+    modifySecurityIpsLoading.value = true;
+    await modifyRdsInstanceSecurityIps(currentIPArrayInstance.value.dbInstanceId, securityIpsForm.value);
+    proxy.$modal.msgSuccess("修改白名单成功");
+    modifySecurityIpsOpen.value = false;
+    // 重新获取白名单信息
+    handleViewIPArrayList(currentIPArrayInstance.value);
+  } catch (error) {
+    proxy.$modal.msgError("修改白名单失败：" + error);
+  } finally {
+    modifySecurityIpsLoading.value = false;
+  }
+}
+
+/** 批量更新客户端白名单操作 */
+async function handleUpdateAllClientWhitelist() {
+  try {
+    await proxy.$modal.confirm('是否确认批量更新所有RDS实例的客户端白名单？此操作将为所有实例添加客户端IP到白名单中。');
+    loading.value = true;
+    await updateAllRdsClientWhitelist();
+    proxy.$modal.msgSuccess("批量更新客户端白名单成功");
+    getList(); // 重新加载列表
+  } catch (error) {
+    if (error === 'cancel') {
+      // 用户取消操作，无需提示
+    } else {
+      proxy.$modal.msgError("批量更新客户端白名单失败：" + error);
     }
   } finally {
     loading.value = false;
