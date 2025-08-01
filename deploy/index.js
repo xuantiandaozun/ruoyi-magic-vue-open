@@ -1,6 +1,6 @@
-import scpClient from 'scp2'
-import ora from 'ora'
 import chalk from 'chalk'
+import ora from 'ora'
+import scpClient from 'scp2'
 const spinner = ora( '正在发布到生产服务器...' )
 spinner.start()
 scpClient.scp(

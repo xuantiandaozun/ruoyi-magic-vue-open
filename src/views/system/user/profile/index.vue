@@ -37,6 +37,31 @@
                         <svg-icon icon-class="date" />创建日期
                         <div class="pull-right">{{ state.user.createTime }}</div>
                      </li>
+                     <li class="list-group-item">
+                        <svg-icon icon-class="link" />飞书授权
+                        <div class="pull-right">
+                           <el-tag v-if="state.feishuAuthorized" type="success">已授权</el-tag>
+                           <el-tag v-else type="info">未授权</el-tag>
+                           <el-button 
+                              v-if="!state.feishuAuthorized" 
+                              type="primary" 
+                              size="small" 
+                              style="margin-left: 10px;"
+                              @click="handleFeishuAuth"
+                              :loading="authLoading">
+                              授权飞书
+                           </el-button>
+                           <el-button 
+                              v-if="state.feishuAuthorized" 
+                              type="danger" 
+                              size="small" 
+                              style="margin-left: 10px;"
+                              @click="handleRevokeFeishuAuth"
+                              :loading="revokeLoading">
+                              注销授权
+                           </el-button>
+                        </div>
+                     </li>
                   </ul>
                </div>
             </el-card>
@@ -63,25 +88,111 @@
 </template>
 
 <script setup name="Profile">
+import { getFeishuAuthUrl, getUserProfile, handleFeishuCallback, revokeFeishuAuth } from "@/api/system/user";
+import { ElMessage, ElMessageBox } from 'element-plus';
+import resetPwd from "./resetPwd";
 import userAvatar from "./userAvatar";
 import userInfo from "./userInfo";
-import resetPwd from "./resetPwd";
-import { getUserProfile } from "@/api/system/user";
 
 const activeTab = ref("userinfo");
+const authLoading = ref(false);
+const revokeLoading = ref(false);
 const state = reactive({
   user: {},
   roleGroup: {},
-  postGroup: {}
+  postGroup: {},
+  feishuAuthorized: false
 });
 
 function getUser() {
   getUserProfile().then(response => {
-    state.user = response;
+    state.user = response.data;
     state.roleGroup = response.roleGroup;
     state.postGroup = response.postGroup;
+    state.feishuAuthorized = response.feishuAuthorized || false;
   });
 };
+
+// 处理飞书授权
+function handleFeishuAuth() {
+  authLoading.value = true;
+  
+  // 构建回调地址
+  const redirectUri = `${window.location.origin}/admin/feishu/callback`;
+  const state_param = `feishu_auth_${Date.now()}`;
+  
+  getFeishuAuthUrl(redirectUri, state_param).then(authUrl => {
+    // 打开新窗口进行授权
+    console.log(authUrl);
+    const authWindow = window.open(authUrl, 'feishu_auth', 'width=600,height=700,scrollbars=yes,resizable=yes');
+    
+    // 监听授权窗口的消息
+    const messageHandler = (event) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      
+      if (event.data.type === 'FEISHU_AUTH_SUCCESS') {
+        // 处理授权成功
+        handleFeishuCallback({
+          code: event.data.code,
+          state: event.data.state,
+          redirectUri: redirectUri
+        }).then(() => {
+          ElMessage.success('飞书授权成功！');
+          state.feishuAuthorized = true;
+          authWindow.close();
+        }).catch(error => {
+          ElMessage.error('授权处理失败：' + error.message);
+        }).finally(() => {
+          authLoading.value = false;
+          window.removeEventListener('message', messageHandler);
+        });
+      } else if (event.data.type === 'FEISHU_AUTH_ERROR') {
+        ElMessage.error('飞书授权失败：' + event.data.error);
+        authLoading.value = false;
+        authWindow.close();
+        window.removeEventListener('message', messageHandler);
+      }
+    };
+    
+    window.addEventListener('message', messageHandler);
+    
+    // 检查窗口是否被关闭
+    const checkClosed = setInterval(() => {
+      if (authWindow.closed) {
+        clearInterval(checkClosed);
+        authLoading.value = false;
+        window.removeEventListener('message', messageHandler);
+      }
+    }, 1000);
+    
+  }).catch(error => {
+    ElMessage.error('获取授权URL失败：' + error.message);
+    authLoading.value = false;
+  });
+}
+
+// 处理飞书授权注销
+function handleRevokeFeishuAuth() {
+  ElMessageBox.confirm('确定要注销飞书授权吗？注销后将无法使用飞书相关功能。', '确认注销', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    revokeLoading.value = true;
+    revokeFeishuAuth().then(() => {
+      ElMessage.success('飞书授权注销成功！');
+      state.feishuAuthorized = false;
+    }).catch(error => {
+      ElMessage.error('注销授权失败：' + error.message);
+    }).finally(() => {
+      revokeLoading.value = false;
+    });
+  }).catch(() => {
+    // 用户取消操作
+  });
+}
 
 getUser();
 </script>

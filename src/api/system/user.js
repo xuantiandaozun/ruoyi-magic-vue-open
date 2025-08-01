@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+import request from '@/utils/request';
 import { parseStrEmpty } from "@/utils/ruoyi";
 
 // 查询用户列表
@@ -75,7 +75,8 @@ export function changeUserStatus(userId, status) {
 export function getUserProfile() {
   return request({
     url: '/system/user/profile',
-    method: 'get'
+    method: 'get',
+    isFullResponse: true
   })
 }
 
@@ -133,5 +134,42 @@ export function deptTreeSelect() {
   return request({
     url: '/system/user/deptTree',
     method: 'get'
+  })
+}
+
+// 获取飞书授权URL
+export function getFeishuAuthUrl(redirectUri, state) {
+  return request({
+    url: '/system/user/profile/feishu/authUrl',
+    method: 'get',
+    params: {
+      redirectUri,
+      state
+    }
+  })
+}
+
+// 处理飞书OAuth回调
+export function handleFeishuCallback(data) {
+  return request({
+    url: '/system/user/profile/feishu/callback',
+    method: 'post',
+    data: data
+  })
+}
+
+// 获取飞书授权状态
+export function getFeishuAuthStatus() {
+  return request({
+    url: '/system/user/profile/feishu/status',
+    method: 'get'
+  })
+}
+
+// 注销飞书授权
+export function revokeFeishuAuth() {
+  return request({
+    url: '/system/user/profile/feishu/revoke',
+    method: 'post'
   })
 }

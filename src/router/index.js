@@ -1,6 +1,6 @@
-import { createWebHistory, createRouter } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router';
 /* Layout */
-import Layout from '@/layout'
+import Layout from '@/layout';
 
 /**
  * Note: 路由配置项
@@ -78,6 +78,13 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/feishu/callback',
+    component: () => import('@/views/feishu/callback'),
+    name: 'FeishuCallback',
+    hidden: true,
+    meta: { title: '飞书授权回调' }
   }
 ]
 
