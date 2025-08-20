@@ -65,6 +65,15 @@
         <el-button
           type="success"
           plain
+          icon="Magic"
+          @click="handleAiPolish"
+          v-hasPermi="['article:blog:add']"
+        >AI润色博客</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="success"
+          plain
           icon="Edit"
           :disabled="single"
           @click="handleUpdate"
@@ -204,11 +213,33 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- AI润色博客对话框 -->
+    <el-dialog title="AI润色博客" v-model="aiPolishOpen" width="80%" :style="{maxWidth: '1200px'}" append-to-body>
+      <el-form ref="aiPolishRef" :model="aiPolishForm" :rules="aiPolishRules" label-width="100px">
+        <el-form-item label="原始内容" prop="content">
+          <el-input
+            v-model="aiPolishForm.content"
+            type="textarea"
+            placeholder="请输入原始内容，支持文档、技术框架用法、脚本代码等各种类型内容"
+            :rows="20"
+            maxlength="30000"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelAiPolish">取 消</el-button>
+          <el-button type="primary" @click="submitAiPolish" :loading="aiPolishLoading">提交润色</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="Blog">
-import { addBlog, delBlog, getBlog, getFeishuDocOptions, listBlog, updateBlog } from "@/api/article/blog";
+import { addBlog, delBlog, getBlog, getFeishuDocOptions, listBlog, updateBlog, polishBlog } from "@/api/article/blog";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -231,6 +262,20 @@ const multiple = ref(true);
 const total = ref(0);
 const title = ref("");
 const daterangePublishTime = ref([]);
+
+// AI润色相关数据
+const aiPolishOpen = ref(false);
+const aiPolishLoading = ref(false);
+const aiPolishRef = ref();
+const aiPolishForm = ref({
+  content: ''
+});
+const aiPolishRules = ref({
+  content: [
+    { required: true, message: "原始内容不能为空", trigger: "blur" },
+    { min: 10, message: "内容长度至少10个字符", trigger: "blur" }
+  ]
+});
 
 const data = reactive({
   form: {},
@@ -460,6 +505,53 @@ function handleExport() {
   proxy.download('article/blog/export', {
     ...queryParams.value
   }, 'blog_' + new Date().getTime() + '.xlsx')
+}
+
+/** AI润色博客按钮操作 */
+function handleAiPolish() {
+  aiPolishForm.value.content = '';
+  aiPolishOpen.value = true;
+}
+
+/** 取消AI润色 */
+function cancelAiPolish() {
+  aiPolishOpen.value = false;
+  aiPolishForm.value.content = '';
+  if (aiPolishRef.value) {
+    aiPolishRef.value.resetFields();
+  }
+}
+
+/** 提交AI润色 */
+async function submitAiPolish() {
+  try {
+    await aiPolishRef.value.validate();
+  } catch (error) {
+    return;
+  }
+
+  aiPolishLoading.value = true;
+  try {
+    const response = await polishBlog({
+      content: aiPolishForm.value.content
+    });
+    
+    if (response.success) {
+      proxy.$modal.msgSuccess(response.message || 'AI润色任务已开始处理，博客将在后台生成');
+      aiPolishOpen.value = false;
+      aiPolishForm.value.content = '';
+      // 刷新列表以显示可能的新博客
+      setTimeout(() => {
+        getList();
+      }, 2000);
+    } else {
+      proxy.$modal.msgError(response.message || 'AI润色失败');
+    }
+  } catch (error) {
+    proxy.$modal.msgError('AI润色失败：' + (error.message || error));
+  } finally {
+    aiPolishLoading.value = false;
+  }
 }
 
 // 在组件挂载后执行查询操作

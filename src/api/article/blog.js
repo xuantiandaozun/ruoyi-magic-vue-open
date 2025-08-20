@@ -50,3 +50,12 @@ export function getFeishuDocOptions() {
     method: 'get'
   })
 }
+
+// AI润色博客内容
+export function polishBlog(data) {
+  return request({
+    url: '/magic/admin/blog/polish',
+    method: 'post',
+    data: data
+  })
+}
