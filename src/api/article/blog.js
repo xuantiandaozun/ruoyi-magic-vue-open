@@ -59,3 +59,11 @@ export function polishBlog(data) {
     data: data
   })
 }
+
+// 自动配图
+export function generateAiImage() {
+  return request({
+    url: '/magic/admin/blog/aiimage',
+    method: 'get'
+  })
+}

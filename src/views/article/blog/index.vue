@@ -74,6 +74,15 @@
         <el-button
           type="success"
           plain
+          icon="Picture"
+          @click="handleAutoImage"
+          v-hasPermi="['article:blog:add']"
+        >自动配图</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="success"
+          plain
           icon="Edit"
           :disabled="single"
           @click="handleUpdate"
@@ -239,7 +248,7 @@
 </template>
 
 <script setup name="Blog">
-import { addBlog, delBlog, getBlog, getFeishuDocOptions, listBlog, updateBlog, polishBlog } from "@/api/article/blog";
+import { addBlog, delBlog, getBlog, getFeishuDocOptions, listBlog, updateBlog, polishBlog, generateAiImage } from "@/api/article/blog";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -255,6 +264,7 @@ const feishuDocList = ref([]);
 const open = ref(false);
 const loading = ref(true);
 const formLoading = ref(false);
+const autoImageLoading = ref(false);
 const showSearch = ref(true);
 const ids = ref([]);
 const single = ref(true);
@@ -505,6 +515,27 @@ function handleExport() {
   proxy.download('article/blog/export', {
     ...queryParams.value
   }, 'blog_' + new Date().getTime() + '.xlsx')
+}
+
+/** 自动配图按钮操作 */
+async function handleAutoImage() {
+  autoImageLoading.value = true;
+  try {
+    const response = await generateAiImage();
+    if (response.success) {
+      proxy.$modal.msgSuccess(response.message || "自动配图任务已开始处理，图片将在后台生成");
+      // 刷新列表以显示可能的新图片
+      setTimeout(() => {
+        getList();
+      }, 2000);
+    } else {
+      proxy.$modal.msgError(response.message || "自动配图失败");
+    }
+  } catch (error) {
+    proxy.$modal.msgError("自动配图失败：" + (error.message || error));
+  } finally {
+    autoImageLoading.value = false;
+  }
 }
 
 /** AI润色博客按钮操作 */
