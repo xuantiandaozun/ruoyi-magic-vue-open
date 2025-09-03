@@ -45,6 +45,7 @@
           />
         </el-select>
       </el-form-item>
+
       <el-form-item class="search-buttons">
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -79,6 +80,17 @@
           v-hasPermi="['article:blog:add']"
         >自动配图</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="warning"
+          plain
+          icon="Search"
+          :disabled="single"
+          @click="handleSeoOptimize"
+          v-hasPermi="['article:blog:edit']"
+        >SEO优化</el-button>
+      </el-col>
+
       <el-col :span="1.5">
         <el-button
           type="success"
@@ -144,11 +156,14 @@
           <dict-tag :options="feishu_sync_status" :value="scope.row.feishuSyncStatus"/>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="180">
+
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="240">
         <template #default="scope">
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['article:blog:edit']">修改</el-button>
           <el-button link type="success" icon="EditPen" @click="handleEditContent(scope.row)" v-hasPermi="['article:blog:edit']">编辑内容</el-button>
-          <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['article:blog:remove']">删除</el-button>
+          <el-button link type="warning" icon="Search" @click="handleSeoOptimize(scope.row)" v-hasPermi="['article:blog:edit']">SEO优化</el-button>
+
+          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['article:blog:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -244,11 +259,13 @@
         </div>
       </template>
     </el-dialog>
+
+
   </div>
 </template>
 
 <script setup name="Blog">
-import { addBlog, delBlog, getBlog, getFeishuDocOptions, listBlog, updateBlog, polishBlog, generateAiImage } from "@/api/article/blog";
+import { addBlog, delBlog, generateAiImage, getBlog, getFeishuDocOptions, listBlog, polishBlog, seoBlog, updateBlog } from "@/api/article/blog";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -286,6 +303,9 @@ const aiPolishRules = ref({
     { min: 10, message: "内容长度至少10个字符", trigger: "blur" }
   ]
 });
+
+// SEO优化相关数据
+const seoOptimizeLoading = ref(false);
 
 const data = reactive({
   form: {},
@@ -585,6 +605,40 @@ async function submitAiPolish() {
   }
 }
 
+/** SEO优化按钮操作 */
+async function handleSeoOptimize(row) {
+  const blogId = row ? row.blogId : ids.value[0];
+  if (!blogId) {
+    proxy.$modal.msgError('请选择要优化的博客');
+    return;
+  }
+
+  seoOptimizeLoading.value = true;
+  try {
+    const response = await seoBlog({ blogId });
+    proxy.$modal.msgSuccess('SEO优化完成，博客内容已自动更新');
+    getList(); // 刷新列表
+  } catch (error) {
+    proxy.$modal.msgError('SEO优化失败：' + (error.message || error));
+  } finally {
+    seoOptimizeLoading.value = false;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // 在组件挂载后执行查询操作
 onMounted(() => {
   getList();
@@ -597,4 +651,34 @@ onUnmounted(() => {
   formLoading.value = false;
 });
 </script>
+
+<style scoped>
+.flexible-search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.search-item {
+  flex: 0 0 auto;
+  min-width: 200px;
+}
+
+.search-buttons {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.custom-dialog .el-dialog__body {
+  padding: 20px;
+}
+
+.dialog-form .el-form-item {
+  margin-bottom: 18px;
+}
+
+.dialog-footer {
+  text-align: right;
+}
+</style>
 

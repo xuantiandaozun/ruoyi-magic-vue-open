@@ -40,6 +40,16 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button
+          type="danger"
+          plain
+          icon="Delete"
+          :disabled="multiple"
+          @click="handleDelete"
+          v-hasPermi="['article:enBlog:remove']"
+        >删除</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button
           type="warning"
           plain
           icon="Download"
@@ -50,7 +60,8 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="enBlogList">
+    <el-table v-loading="loading" :data="enBlogList" @selection-change="handleSelectionChange">
+      <el-table-column type="selection" width="55" align="center" />
       <el-table-column label="英文博客标题" align="center" prop="title" show-overflow-tooltip />
       <el-table-column label="博客摘要" align="center" prop="summary" show-overflow-tooltip width="200" />
       <el-table-column label="封面图片" align="center" prop="coverImage" width="100">
@@ -79,6 +90,16 @@
       </el-table-column>
       <el-table-column label="浏览次数" align="center" prop="viewCount" width="100" />
       <el-table-column label="点赞次数" align="center" prop="likeCount" width="100" />
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+        <template #default="scope">
+          <el-button
+            type="text"
+            icon="Delete"
+            @click="handleDelete(scope.row)"
+            v-hasPermi="['article:enBlog:remove']"
+          >删除</el-button>
+        </template>
+      </el-table-column>
     </el-table>
     
     <pagination
@@ -94,7 +115,7 @@
 </template>
 
 <script setup name="EnBlog">
-import { listEnBlog } from "@/api/article/enBlog";
+import { listEnBlog, delEnBlog } from "@/api/article/enBlog";
 import { onMounted, onUnmounted, getCurrentInstance, ref, reactive, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
@@ -106,6 +127,9 @@ const loading = ref(true);
 const showSearch = ref(true);
 const total = ref(0);
 const daterangePublishTime = ref([]);
+const ids = ref([]);
+const single = ref(true);
+const multiple = ref(true);
 
 const data = reactive({
   queryParams: {
@@ -159,6 +183,24 @@ function resetQuery() {
 }
 
 
+
+/** 多选框选中数据 */
+function handleSelectionChange(selection) {
+  ids.value = selection.map(item => item.blogId);
+  single.value = selection.length !== 1;
+  multiple.value = !selection.length;
+}
+
+/** 删除按钮操作 */
+function handleDelete(row) {
+  const blogIds = row.blogId || ids.value;
+  proxy.$modal.confirm('是否确认删除英文博客编号为"' + blogIds + '"的数据项？').then(function() {
+    return delEnBlog(blogIds);
+  }).then(() => {
+    getList();
+    proxy.$modal.msgSuccess("删除成功");
+  }).catch(() => {});
+}
 
 /** 导出按钮操作 */
 function handleExport() {

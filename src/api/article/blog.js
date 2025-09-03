@@ -67,3 +67,21 @@ export function generateAiImage() {
     method: 'get'
   })
 }
+
+// SEO优化博客
+export function seoBlog(data) {
+  return request({
+    url: '/magic/admin/blog/SEOBlog',
+    method: 'post',
+    data: data
+  })
+}
+
+// 更新博客CSDN同步信息
+export function updateCsdnInfo(blogId, csdnInfo) {
+  return request({
+    url: '/article/blog/updateCsdnInfo/' + blogId,
+    method: 'post',
+    data: csdnInfo
+  })
+}
