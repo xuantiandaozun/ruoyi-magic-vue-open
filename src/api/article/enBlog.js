@@ -42,3 +42,12 @@ export function delEnBlog(blogId) {
     method: 'delete'
   })
 }
+
+// 英文博客SEO优化
+export function seoEnBlog(data) {
+  return request({
+    url: '/magic/admin/blog/SEOBlogEn',
+    method: 'post',
+    data: data
+  })
+}
