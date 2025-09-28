@@ -162,7 +162,38 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="配置数据" prop="configData">
-          <el-input v-model="form.configData" type="textarea" placeholder="请输入内容" />
+          <div class="dynamic-fields">
+            <div v-for="(field, index) in dynamicFields" :key="index" class="field-row">
+              <el-input 
+                v-model="field.key" 
+                placeholder="如: accessKeyId, endpoint, bucketName" 
+                style="width: 40%; margin-right: 10px;"
+                @input="updateConfigData"
+              />
+              <el-input 
+                v-model="field.value" 
+                placeholder="字段值" 
+                style="width: 40%; margin-right: 10px;"
+                @input="updateConfigData"
+              />
+              <el-button 
+                type="danger" 
+                icon="Delete" 
+                size="small" 
+                @click="removeField(index)"
+                :disabled="dynamicFields.length <= 1"
+              />
+            </div>
+            <el-button 
+              type="primary" 
+              icon="Plus" 
+              size="small" 
+              @click="addField"
+              style="margin-top: 10px;"
+            >
+              添加字段
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入内容" />
@@ -199,6 +230,7 @@ const single = ref(true);
 const multiple = ref(true);
 const total = ref(0);
 const title = ref("");
+const dynamicFields = ref([{ key: '', value: '' }]);
 
 const data = reactive({
   form: {},
@@ -259,8 +291,78 @@ function reset() {
     remark: null,
     delFlag: null
   };
+  dynamicFields.value = [{ key: '', value: '' }];
   if (storageConfigRef.value) {
     storageConfigRef.value.resetFields();
+  }
+}
+
+// 添加动态字段
+function addField() {
+  dynamicFields.value.push({ key: '', value: '' });
+}
+
+// 删除动态字段
+function removeField(index) {
+  if (dynamicFields.value.length > 1) {
+    dynamicFields.value.splice(index, 1);
+    updateConfigData();
+  }
+}
+
+// 更新配置数据
+function updateConfigData() {
+  const configObj = {};
+  dynamicFields.value.forEach(field => {
+    if (field.key && field.key.trim()) {
+      configObj[field.key.trim()] = field.value || '';
+    }
+  });
+  form.value.configData = JSON.stringify(configObj, null, 2);
+}
+
+// 验证动态字段
+function validateDynamicFields() {
+  const keys = [];
+  for (let i = 0; i < dynamicFields.value.length; i++) {
+    const field = dynamicFields.value[i];
+    
+    // 检查字段名是否为空
+    if (!field.key || !field.key.trim()) {
+      proxy.$modal.msgError(`第${i + 1}行的字段名不能为空`);
+      return false;
+    }
+    
+    // 检查字段名是否重复
+    const trimmedKey = field.key.trim();
+    if (keys.includes(trimmedKey)) {
+      proxy.$modal.msgError(`字段名"${trimmedKey}"重复，请修改`);
+      return false;
+    }
+    keys.push(trimmedKey);
+  }
+  return true;
+}
+
+// 解析配置数据到动态字段
+function parseConfigData(configData) {
+  if (!configData) {
+    dynamicFields.value = [{ key: '', value: '' }];
+    return;
+  }
+  
+  try {
+    const configObj = JSON.parse(configData);
+    const fields = [];
+    
+    Object.keys(configObj).forEach(key => {
+      fields.push({ key: key, value: configObj[key] || '' });
+    });
+    
+    dynamicFields.value = fields.length > 0 ? fields : [{ key: '', value: '' }];
+  } catch (error) {
+    // 如果解析失败，保持原有的文本框形式
+    dynamicFields.value = [{ key: 'configData', value: configData }];
   }
 }
 
@@ -289,6 +391,7 @@ function handleSelectionChange(selection) {
 function handleAdd() {
   try {
     reset();
+    dynamicFields.value = [{ key: '', value: '' }];
     formLoading.value = false; // 确保加载状态重置
     open.value = true;
     title.value = "添加存储配置";
@@ -306,6 +409,7 @@ async function handleUpdate(row) {
   try {
     const response = await getStorageConfig(editId);
     form.value = response;
+    parseConfigData(response.configData);
     open.value = true;
     title.value = "修改存储配置";
   } catch (error) {
@@ -323,6 +427,14 @@ async function submitForm() {
     // Validation failed, do nothing as Element Plus will highlight fields
     return;
   }
+
+  // 验证动态字段
+  if (!validateDynamicFields()) {
+    return;
+  }
+
+  // 在提交前更新配置数据
+  updateConfigData();
 
   formLoading.value = true;
   try {
@@ -379,4 +491,32 @@ onUnmounted(() => {
   formLoading.value = false;
 });
 </script>
+
+<style scoped>
+.dynamic-fields {
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 15px;
+  background-color: #fafafa;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.field-row:last-of-type {
+  margin-bottom: 0;
+}
+
+.field-row .el-input {
+  flex: 1;
+}
+
+.field-row .el-button {
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+</style>
 
