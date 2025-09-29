@@ -33,7 +33,25 @@ export default defineConfig(({ mode, command }) => {
         '/dev-api': {
           target: 'http://localhost:8080',
           changeOrigin: true,
-          rewrite: (p) => p.replace(/^\/dev-api/, '')
+          rewrite: (p) => p.replace(/^\/dev-api/, ''),
+          timeout: 600000, // 10分钟超时，适合大文件上传
+          proxyTimeout: 600000, // 代理超时时间
+          configure: (proxy, options) => {
+            // 针对文件上传接口的特殊配置
+            proxy.on('proxyReq', (proxyReq, req, res) => {
+              // 增加请求超时时间
+              proxyReq.setTimeout(600000); // 10分钟
+              // 设置keep-alive
+              proxyReq.setHeader('Connection', 'keep-alive');
+              // 如果是文件上传请求，设置更大的超时
+              if (req.url && req.url.includes('/common/upload')) {
+                proxyReq.setTimeout(900000); // 15分钟
+              }
+            });
+            proxy.on('error', (err, req, res) => {
+              console.error('代理错误:', err);
+            });
+          }
         }
       }
     },

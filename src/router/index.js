@@ -85,6 +85,19 @@ export const constantRoutes = [
     name: 'FeishuCallback',
     hidden: true,
     meta: { title: '飞书授权回调' }
+  },
+  {
+    path: '/ai',
+    component: Layout,
+    redirect: '/ai/chat',
+    children: [
+      {
+        path: 'chat',
+        component: () => import('@/views/ai/chat'),
+        name: 'AiChat',
+        meta: { title: 'AI助手' }
+      }
+    ]
   }
 ]
 

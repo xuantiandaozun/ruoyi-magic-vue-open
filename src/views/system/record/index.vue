@@ -430,6 +430,20 @@ async function submitForm() {
           return;
         }
         
+        // 检查文件大小（100MB限制）
+        const maxSize = 100 * 1024 * 1024; // 100MB
+        if (selectedFile.value.size > maxSize) {
+          proxy.$modal.msgError(`文件大小不能超过100MB，当前文件大小：${(selectedFile.value.size / 1024 / 1024).toFixed(2)}MB`);
+          formLoading.value = false;
+          return;
+        }
+        
+        console.log('开始上传文件:', {
+          name: selectedFile.value.name,
+          size: selectedFile.value.size,
+          type: selectedFile.value.type
+        });
+        
         // 创建FormData进行文件上传
         const formData = new FormData();
         formData.append('file', selectedFile.value);
@@ -440,8 +454,10 @@ async function submitForm() {
           method: 'post',
           data: formData,
           headers: {
-            'Content-Type': 'multipart/form-data'
-          }
+            'Content-Type': 'multipart/form-data',
+            'repeatSubmit': false  // 禁用防重复提交检查
+          },
+          timeout: 600000  // 10分钟超时，专门用于大文件上传
         });
         
         proxy.$modal.msgSuccess("文件上传成功");
