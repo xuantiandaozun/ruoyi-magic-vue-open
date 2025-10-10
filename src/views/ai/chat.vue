@@ -54,6 +54,18 @@
               <div class="message-text" v-html="formatMessage(message.content)"></div>
               <!-- 流式输入光标 -->
               <span v-if="index === streamingMessageIndex" class="typing-cursor">|</span>
+              <!-- AI消息复制按钮 -->
+              <div v-if="message.role === 'assistant' && message.content" class="message-actions">
+                <el-button 
+                  type="text" 
+                  size="small" 
+                  @click="copyMessage(message.content)"
+                  class="copy-message-btn"
+                >
+                  <el-icon><DocumentCopy /></el-icon>
+                  复制
+                </el-button>
+              </div>
             </div>
           </div>
         </div>
@@ -240,9 +252,94 @@
 <script setup>
 import { clearChatHistory, createChatStream, getChatHistory, getAvailableChatModels } from '@/api/ai/chat'
 import { addModelConfig, delModelConfig, getModelConfig, listModelConfigs, updateModelConfig } from '@/api/ai/modelConfig'
-import { ChatDotRound, UserFilled, Plus } from '@element-plus/icons-vue'
+import { ChatDotRound, UserFilled, Plus, DocumentCopy } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { marked } from 'marked'
+import hljs from 'highlight.js/lib/common'
+import 'highlight.js/styles/vs2015.css'
+
+// 配置marked和highlight.js
+marked.setOptions({
+  highlight: function(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(code, { language: lang }).value
+      } catch (err) {
+        console.warn('代码高亮失败:', err)
+      }
+    }
+    return hljs.highlightAuto(code).value
+  },
+  breaks: true, // 支持换行
+  gfm: true, // 支持GitHub风格的Markdown
+  // 确保 <code> 元素包含 .hljs 以应用主题样式
+  langPrefix: 'hljs language-'
+})
+
+// 复制功能相关方法
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('复制成功')
+  } catch (err) {
+    console.error('复制失败:', err)
+    // 降级方案
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      ElMessage.success('复制成功')
+    } catch (fallbackErr) {
+      ElMessage.error('复制失败')
+    }
+    document.body.removeChild(textArea)
+  }
+}
+
+// 复制代码块
+const copyCodeBlock = (code) => {
+  copyToClipboard(code)
+}
+
+// 复制整个消息
+const copyMessage = (content) => {
+  copyToClipboard(content)
+}
+
+// 不再暴露全局函数，统一使用事件委托处理复制点击
+
+// 事件委托：处理代码块复制按钮点击（避免 CSP 禁止 inline onclick）
+const handleCopyClick = (e) => {
+  const btn = e.target.closest?.('.copy-code-btn')
+  if (!btn) return
+  const wrapper = btn.closest('.code-block-wrapper')
+  const codeEl = wrapper?.querySelector('pre code')
+  const codeText = codeEl?.textContent || ''
+  if (codeText) {
+    copyCodeBlock(codeText)
+  }
+}
+
+onMounted(() => {
+  // 将事件绑定到聊天内容容器上
+  if (chatContent.value) {
+    chatContent.value.addEventListener('click', handleCopyClick)
+  } else {
+    // 兜底：绑定到 document
+    document.addEventListener('click', handleCopyClick)
+  }
+})
+
+onUnmounted(() => {
+  if (chatContent.value) {
+    chatContent.value.removeEventListener('click', handleCopyClick)
+  } else {
+    document.removeEventListener('click', handleCopyClick)
+  }
+})
 
 // 响应式数据
 const messages = ref([])
@@ -498,19 +595,76 @@ const clearHistory = async () => {
 // 格式化消息内容（支持Markdown）
 const formatMessage = (content) => {
   try {
-    // 对于流式内容，先进行简单的换行处理，避免频繁的Markdown解析
-    if (!content || content.length === 0) {
-      return ''
-    }
-    
-    // 简单的文本格式化，避免复杂的Markdown解析影响性能
+    if (!content || content.length === 0) return ''
+    // 先用 marked 渲染为 HTML
+    const rawHtml = marked.parse(content)
+    // 使用 DOM 解析，避免正则重复替换导致的错误结构
+    const container = document.createElement('div')
+    container.innerHTML = rawHtml
+
+    const blocks = container.querySelectorAll('pre > code')
+    blocks.forEach((codeEl) => {
+      const preEl = codeEl.parentElement
+      if (!preEl) return
+      // 幂等：如果该 pre 已经在包装器内，直接跳过
+      const alreadyWrapped = preEl.closest('.code-block-wrapper')
+      if (alreadyWrapped) return
+
+      // 语言识别：从 className 中提取 language-xxx，否则为 text
+      const className = codeEl.getAttribute('class') || ''
+      const langMatch = className.match(/language-([\w-]+)/)
+      const lang = (langMatch && langMatch[1]) ? langMatch[1] : 'text'
+
+      // 确保应用 hljs 类以启用主题样式
+      if (!/\bhljs\b/.test(className)) {
+        codeEl.classList.add('hljs')
+      }
+
+      // 构造包装器与头部（语言 + 复制按钮）
+      const wrapper = document.createElement('div')
+      wrapper.className = 'code-block-wrapper'
+
+      const header = document.createElement('div')
+      header.className = 'code-block-header'
+
+      const label = document.createElement('span')
+      label.className = 'code-language'
+      label.textContent = lang
+
+      const btn = document.createElement('button')
+      btn.className = 'copy-code-btn'
+      btn.type = 'button'
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>复制'
+
+      header.appendChild(label)
+      header.appendChild(btn)
+
+      // 用包装器替换原 pre，保持结构：wrapper(header + pre)
+      preEl.replaceWith(wrapper)
+      wrapper.appendChild(header)
+      wrapper.appendChild(preEl)
+    })
+
+    // 兜底高亮：若某些代码块没有被 marked 的 highlight 函数处理（无 span），主动调用 hljs.highlightElement
+    const codeNodes = container.querySelectorAll('pre > code')
+    codeNodes.forEach((codeEl) => {
+      if (!codeEl.querySelector('span')) {
+        try {
+          hljs.highlightElement(codeEl)
+        } catch (err) {
+          console.warn('兜底高亮失败:', err)
+        }
+      }
+    })
+
+    return container.innerHTML
+  } catch (error) {
+    console.warn('Markdown渲染失败:', error)
     return content
       .replace(/\n/g, '<br>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/`(.*?)`/g, '<code>$1</code>')
-  } catch (error) {
-    return content
   }
 }
 
@@ -1052,21 +1206,133 @@ const scrollToBottom = () => {
   text-decoration: underline;
 }
 
-/* 打字机光标效果 */
+/* 代码高亮样式增强 */
+.message-text :deep(.hljs) {
+  background: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.message-text :deep(.hljs-keyword) {
+  color: #569cd6 !important;
+}
+
+.message-text :deep(.hljs-string) {
+  color: #ce9178 !important;
+}
+
+.message-text :deep(.hljs-comment) {
+  color: #6a9955 !important;
+}
+
+.message-text :deep(.hljs-number) {
+  color: #b5cea8 !important;
+}
+
+.message-text :deep(.hljs-function) {
+  color: #dcdcaa !important;
+}
+
+.message-text :deep(.hljs-variable) {
+  color: #9cdcfe !important;
+}
+
+/* 流式输入光标样式 */
 .typing-cursor {
   display: inline-block;
-  color: #10a37f;
-  font-weight: bold;
-  animation: blink 1s infinite;
+  width: 2px;
+  height: 1.2em;
+  background-color: #10a37f;
   margin-left: 2px;
+  animation: blink 1s infinite;
 }
 
 @keyframes blink {
-  0%, 50% {
-    opacity: 1;
-  }
-  51%, 100% {
-    opacity: 0;
-  }
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* 代码块包装器样式 */
+.message-text :deep(.code-block-wrapper) {
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1e1e1e;
+  border: 1px solid #333;
+}
+
+.message-text :deep(.code-block-header) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: #2d2d2d;
+  border-bottom: 1px solid #333;
+}
+
+.message-text :deep(.code-language) {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.message-text :deep(.copy-code-btn) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.message-text :deep(.copy-code-btn:hover) {
+  background: #404040;
+  border-color: #666;
+  color: #fff;
+}
+
+.message-text :deep(.copy-code-btn svg) {
+  width: 14px;
+  height: 14px;
+}
+
+.message-text :deep(.code-block-wrapper pre) {
+  margin: 0;
+  background: #1e1e1e !important;
+  border-radius: 0;
+}
+
+/* 消息操作按钮样式 */
+.message-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-wrapper:hover .message-actions {
+  opacity: 1;
+}
+
+.copy-message-btn {
+  color: #6b7280 !important;
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+}
+
+.copy-message-btn:hover {
+  color: #10a37f !important;
+  background: rgba(16, 163, 127, 0.1) !important;
 }
 </style>
