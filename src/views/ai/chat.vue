@@ -51,6 +51,43 @@
               </el-avatar>
             </div>
             <div class="message-content">
+              <!-- 工具调用显示 -->
+              <div v-if="message.toolCalls && message.toolCalls.length > 0" class="tool-calls-section">
+                <div 
+                  v-for="(toolCall, toolIndex) in message.toolCalls" 
+                  :key="toolIndex"
+                  class="tool-call-item"
+                >
+                  <el-collapse v-model="toolCall.activeNames" class="tool-call-collapse">
+                    <el-collapse-item :name="'tool-' + toolIndex" class="tool-call-panel">
+                      <template #title>
+                        <div class="tool-call-header">
+                          <el-icon class="tool-icon"><Tools /></el-icon>
+                          <span class="tool-name">{{ toolCall.name }}</span>
+                          <el-tag 
+                            :type="toolCall.status === 'completed' ? 'success' : toolCall.status === 'error' ? 'danger' : 'info'"
+                            size="small"
+                            class="tool-status"
+                          >
+                            {{ getToolStatusText(toolCall.status) }}
+                          </el-tag>
+                        </div>
+                      </template>
+                      <div class="tool-call-content">
+                        <div v-if="toolCall.input" class="tool-input">
+                          <div class="tool-section-title">输入参数:</div>
+                          <pre class="tool-data">{{ formatToolData(toolCall.input) }}</pre>
+                        </div>
+                        <div v-if="toolCall.output" class="tool-output">
+                          <div class="tool-section-title">执行结果:</div>
+                          <pre class="tool-data">{{ formatToolData(toolCall.output) }}</pre>
+                        </div>
+                      </div>
+                    </el-collapse-item>
+                  </el-collapse>
+                </div>
+              </div>
+              
               <div class="message-text" v-html="formatMessage(message.content)"></div>
               <!-- 流式输入光标 -->
               <span v-if="index === streamingMessageIndex" class="typing-cursor">|</span>
@@ -252,7 +289,7 @@
 <script setup>
 import { clearChatHistory, createChatStream, getChatHistory, getAvailableChatModels } from '@/api/ai/chat'
 import { addModelConfig, delModelConfig, getModelConfig, listModelConfigs, updateModelConfig } from '@/api/ai/modelConfig'
-import { ChatDotRound, UserFilled, Plus, DocumentCopy } from '@element-plus/icons-vue'
+import { ChatDotRound, UserFilled, Plus, DocumentCopy, Tools } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { marked } from 'marked'
@@ -309,6 +346,34 @@ const copyMessage = (content) => {
   copyToClipboard(content)
 }
 
+// 工具调用相关函数
+const getToolStatusText = (status) => {
+  switch (status) {
+    case 'calling':
+      return '调用中'
+    case 'completed':
+      return '已完成'
+    case 'error':
+      return '执行失败'
+    default:
+      return '未知状态'
+  }
+}
+
+const formatToolData = (data) => {
+  if (typeof data === 'string') {
+    try {
+      // 尝试解析JSON并格式化
+      const parsed = JSON.parse(data)
+      return JSON.stringify(parsed, null, 2)
+    } catch {
+      // 如果不是JSON，直接返回
+      return data
+    }
+  }
+  return JSON.stringify(data, null, 2)
+}
+
 // 不再暴露全局函数，统一使用事件委托处理复制点击
 
 // 事件委托：处理代码块复制按钮点击（避免 CSP 禁止 inline onclick）
@@ -348,6 +413,7 @@ const isLoading = ref(false)
 const chatContent = ref(null)
 const currentConnection = ref(null)
 const streamingMessageIndex = ref(-1) // 正在流式输入的消息索引
+const toolCalls = ref([]) // 当前对话中的工具调用记录
 
 // 聊天模型相关
 const chatModels = ref([])
@@ -476,7 +542,8 @@ const handleSend = async () => {
   const aiMessage = {
     role: 'assistant',
     content: '',
-    timestamp: new Date()
+    timestamp: new Date(),
+    toolCalls: [] // 初始化工具调用数组
   }
   messages.value.push(aiMessage)
   const aiMessageIndex = messages.value.length - 1
@@ -493,10 +560,17 @@ const handleSend = async () => {
       currentConnection.value.abort()
     }
     
+    // 准备聊天历史（排除当前刚添加的用户消息和AI消息占位符）
+    const chatHistory = messages.value.slice(0, -2).map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }))
+    
     const connection = createChatStream({
       message: currentInput,
       systemPrompt: '',
-      modelConfigId: selectedModelId.value
+      modelConfigId: selectedModelId.value,
+      chatHistory: chatHistory
     }, {
       onMessage: (chunk) => {
         // 实时更新AI消息内容
@@ -514,6 +588,46 @@ const handleSend = async () => {
         console.log('更新后的内容:', messages.value[aiMessageIndex].content); // 调试信息
         
         // 立即滚动到底部，确保用户能看到新内容
+        nextTick(() => {
+          scrollToBottom()
+        })
+      },
+      onToolCall: (toolName, toolInput) => {
+        // 处理工具调用事件
+        console.log('工具调用:', toolName, toolInput);
+        const currentMessage = messages.value[aiMessageIndex]
+        if (currentMessage) {
+          // 添加新的工具调用记录
+          const toolCallIndex = currentMessage.toolCalls.length
+          const toolCall = {
+            name: toolName,
+            input: toolInput,
+            output: null,
+            status: 'calling',
+            activeNames: [] // 默认不展开工具调用
+          }
+          currentMessage.toolCalls.push(toolCall)
+        }
+        
+        // 滚动到底部显示工具调用
+        nextTick(() => {
+          scrollToBottom()
+        })
+      },
+      onToolResult: (toolName, toolOutput) => {
+        // 处理工具结果事件
+        console.log('工具结果:', toolName, toolOutput);
+        const currentMessage = messages.value[aiMessageIndex]
+        if (currentMessage && currentMessage.toolCalls) {
+          // 找到对应的工具调用并更新结果
+          const toolCall = currentMessage.toolCalls.find(tc => tc.name === toolName && tc.status === 'calling')
+          if (toolCall) {
+            toolCall.output = toolOutput
+            toolCall.status = 'completed'
+          }
+        }
+        
+        // 滚动到底部显示工具结果
         nextTick(() => {
           scrollToBottom()
         })
@@ -1334,5 +1448,128 @@ const scrollToBottom = () => {
 .copy-message-btn:hover {
   color: #10a37f !important;
   background: rgba(16, 163, 127, 0.1) !important;
+}
+
+/* 工具调用样式 */
+.tool-calls-section {
+  margin-bottom: 16px;
+}
+
+.tool-call-item {
+  margin-bottom: 8px;
+}
+
+.tool-call-collapse {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tool-call-collapse :deep(.el-collapse-item__header) {
+  background-color: #f8f9fa;
+  padding: 12px 16px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.tool-call-collapse :deep(.el-collapse-item__header):hover {
+  background-color: #f0f2f5;
+}
+
+.tool-call-collapse :deep(.el-collapse-item__content) {
+  padding: 0;
+  border: none;
+}
+
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.tool-icon {
+  color: #409eff;
+  font-size: 16px;
+}
+
+.tool-name {
+  font-weight: 500;
+  color: #303133;
+  flex: 1;
+}
+
+.tool-status {
+  margin-left: auto;
+}
+
+.tool-call-content {
+  padding: 16px;
+  background-color: #fafafa;
+}
+
+.tool-section-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  margin-bottom: 8px;
+}
+
+.tool-input {
+  margin-bottom: 16px;
+}
+
+.tool-output {
+  margin-bottom: 0;
+}
+
+.tool-data {
+  background-color: #f5f5f5;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #303133;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0;
+}
+
+/* 深色主题下的工具调用样式 */
+@media (prefers-color-scheme: dark) {
+  .tool-call-collapse {
+    border-color: #4c4d4f;
+  }
+  
+  .tool-call-collapse :deep(.el-collapse-item__header) {
+    background-color: #2b2b2b;
+  }
+  
+  .tool-call-collapse :deep(.el-collapse-item__header):hover {
+    background-color: #363637;
+  }
+  
+  .tool-name {
+    color: #e4e7ed;
+  }
+  
+  .tool-call-content {
+    background-color: #1d1e1f;
+  }
+  
+  .tool-section-title {
+    color: #a8abb2;
+  }
+  
+  .tool-data {
+    background-color: #262727;
+    border-color: #4c4d4f;
+    color: #e4e7ed;
+  }
 }
 </style>

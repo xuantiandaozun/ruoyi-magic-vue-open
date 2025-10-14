@@ -82,22 +82,97 @@ export function clearChatHistory() {
 
 // 创建SSE连接进行流式聊天
 export function createChatStream(data, callbacks, options = {}) {
-  const { onMessage, onError, onComplete } = callbacks;
-  const { maxRetries = 3, retryDelay = 1000 } = options;
+  const { onMessage, onError, onComplete, onToolCall, onToolResult } = callbacks;
+  const { maxRetries = 5, retryDelay = 1000, enableVisibilityReconnect = true } = options;
   
   let retryCount = 0;
   let abortController = new AbortController();
+  let isCompleted = false;
+  let isAborted = false;
+  let visibilityReconnectTimer = null;
+  let lastActivity = Date.now();
+  let heartbeatTimer = null;
+  
+  // 页面可见性状态管理
+  let wasHidden = false;
+  
+  // 页面可见性变化处理
+  function handleVisibilityChange() {
+    if (!enableVisibilityReconnect || isCompleted || isAborted) return;
+    
+    if (document.hidden) {
+      // 页面被隐藏，记录状态但不立即断开连接
+      wasHidden = true;
+      console.log('页面被隐藏，标记状态');
+    } else if (wasHidden) {
+      // 页面重新可见，检查连接状态
+      wasHidden = false;
+      const timeSinceLastActivity = Date.now() - lastActivity;
+      console.log(`页面重新可见，距离上次活动: ${timeSinceLastActivity}ms`);
+      
+      // 如果超过30秒没有活动，尝试重新连接
+      if (timeSinceLastActivity > 30000) {
+        console.log('检测到长时间不活跃，尝试重新连接');
+        // 取消当前连接并重新连接
+        abortController.abort();
+        retryCount = 0; // 重置重试计数
+        
+        // 延迟一点时间再重连，避免频繁重连
+        visibilityReconnectTimer = setTimeout(() => {
+          if (!isCompleted && !isAborted) {
+            abortController = new AbortController();
+            attemptConnection().catch(error => {
+              console.error('可见性重连失败:', error);
+              if (onError && !isCompleted) onError(`重连失败: ${error.message}`);
+            });
+          }
+        }, 1000);
+      }
+    }
+  }
+  
+  // 心跳检测
+  function startHeartbeat() {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(() => {
+      if (isCompleted || isAborted) {
+        clearInterval(heartbeatTimer);
+        return;
+      }
+      
+      const timeSinceLastActivity = Date.now() - lastActivity;
+      // 如果超过2分钟没有收到数据，可能连接已断开
+      if (timeSinceLastActivity > 120000) {
+        console.warn('检测到连接可能已断开，尝试重连');
+        abortController.abort();
+        retryCount = Math.max(0, retryCount - 1); // 适当减少重试计数
+        
+        setTimeout(() => {
+          if (!isCompleted && !isAborted) {
+            abortController = new AbortController();
+            attemptConnection().catch(error => {
+              console.error('心跳重连失败:', error);
+            });
+          }
+        }, 2000);
+      }
+    }, 30000); // 每30秒检查一次
+  }
   
   function attemptConnection() {
     return new Promise((resolve, reject) => {
       const baseURL = import.meta.env.VITE_APP_BASE_API || '';
       const url = `${baseURL}/ai/chat/stream`;
+      
+      console.log(`尝试SSE连接 (第${retryCount + 1}次)`);
+      
       fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
           'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
           'Authorization': getToken()
         },
         body: JSON.stringify(data),
@@ -107,24 +182,26 @@ export function createChatStream(data, callbacks, options = {}) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
+        console.log('SSE连接建立成功');
+        retryCount = 0; // 连接成功后重置重试计数
+        lastActivity = Date.now();
+        startHeartbeat();
+        
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
 
         // 解析 SSE 事件块（以 \n\n 作为事件边界，支持多行 data）
         function processEvents(text) {
-          console.log('处理SSE事件:', text); // 调试信息
+          lastActivity = Date.now(); // 更新活动时间
           const events = text.split('\n\n');
           for (const evt of events) {
             if (!evt || !evt.trim()) continue;
-            console.log('处理单个事件:', evt); // 调试信息
             const lines = evt.split('\n');
             const dataLines = [];
             for (const line of lines) {
               if (line.startsWith('data:')) {
-                // 保留行内可能的值但移除前缀
                 const data = line.slice(5).trimStart();
-                console.log('提取的数据:', data); // 调试信息
                 dataLines.push(data);
               }
             }
@@ -132,31 +209,35 @@ export function createChatStream(data, callbacks, options = {}) {
             const payload = dataLines.join('\n');
             
             if (payload === '[DONE]') {
-              console.log('收到完成信号'); // 调试信息
+              console.log('收到完成信号');
+              isCompleted = true;
+              cleanup();
               if (onComplete) onComplete();
               resolve();
-              return true; // 指示完成
+              return true;
             }
             
             try {
               const eventData = JSON.parse(payload);
-              console.log('解析的事件数据:', eventData); // 调试信息
               if (eventData.type === 'message' && onMessage) {
-                console.log('调用onMessage:', eventData.content); // 调试信息
                 onMessage(eventData.content ?? '');
+              } else if (eventData.type === 'tool_call' && onToolCall) {
+                onToolCall(eventData.toolName, eventData.toolArgs);
+              } else if (eventData.type === 'tool_result' && onToolResult) {
+                onToolResult(eventData.toolName, eventData.result);
               } else if (eventData.type === 'error') {
                 const errMsg = eventData.content || '未知错误';
+                isCompleted = true;
+                cleanup();
                 if (onError) onError(errMsg);
                 reject(new Error(errMsg));
-                return true; // 终止读取
+                return true;
               } else {
                 // 未知类型，作为纯文本回退
-                console.log('未知类型，作为纯文本:', payload); // 调试信息
                 if (onMessage) onMessage(payload);
               }
             } catch (e) {
               // 非 JSON，作为纯文本
-              console.log('JSON解析失败，作为纯文本:', payload, e); // 调试信息
               if (onMessage) onMessage(payload);
             }
           }
@@ -166,6 +247,9 @@ export function createChatStream(data, callbacks, options = {}) {
         function readStream() {
           return reader.read().then(({ done, value }) => {
             if (done) {
+              console.log('SSE流读取完成');
+              isCompleted = true;
+              cleanup();
               if (onComplete) onComplete();
               resolve();
               return;
@@ -178,13 +262,14 @@ export function createChatStream(data, callbacks, options = {}) {
               const processable = buffer.slice(0, lastBoundary);
               buffer = buffer.slice(lastBoundary + 2);
               const finished = processEvents(processable);
-              if (finished) return; // 已完成或错误
+              if (finished) return;
             }
             
             return readStream();
           }).catch(error => {
             if (error.name === 'AbortError') {
-              resolve(); // 用户主动取消
+              console.log('SSE连接被主动取消');
+              resolve();
               return;
             }
             throw error;
@@ -194,24 +279,55 @@ export function createChatStream(data, callbacks, options = {}) {
         return readStream();
       }).catch(error => {
         if (error.name === 'AbortError') {
-          resolve(); // 用户主动取消
+          console.log('连接被取消');
+          resolve();
           return;
         }
         
-        // 网络错误或其他错误，尝试重连
-        if (retryCount < maxRetries) {
+        console.error('SSE连接错误:', error.message);
+        
+        // 智能重连逻辑
+        const shouldRetry = retryCount < maxRetries && !isCompleted && !isAborted;
+        const isNetworkError = error.message.includes('fetch') || 
+                              error.message.includes('network') || 
+                              error.message.includes('Failed to fetch');
+        
+        if (shouldRetry && (isNetworkError || error.message.includes('HTTP 5'))) {
           retryCount++;
-          console.warn(`SSE连接失败，正在重试 (${retryCount}/${maxRetries}):`, error.message);
+          const delay = Math.min(retryDelay * Math.pow(2, retryCount - 1), 10000); // 指数退避，最大10秒
+          console.warn(`SSE连接失败，${delay}ms后重试 (${retryCount}/${maxRetries}):`, error.message);
           
           setTimeout(() => {
-            attemptConnection().then(resolve).catch(reject);
-          }, retryDelay * retryCount); // 递增延迟
+            if (!isCompleted && !isAborted) {
+              abortController = new AbortController();
+              attemptConnection().then(resolve).catch(reject);
+            }
+          }, delay);
         } else {
-          if (onError) onError(`连接失败: ${error.message}`);
+          cleanup();
+          if (onError && !isCompleted) onError(`连接失败: ${error.message}`);
           reject(error);
         }
       });
     });
+  }
+  
+  // 清理资源
+  function cleanup() {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+    if (visibilityReconnectTimer) {
+      clearTimeout(visibilityReconnectTimer);
+      visibilityReconnectTimer = null;
+    }
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }
+  
+  // 监听页面可见性变化
+  if (enableVisibilityReconnect) {
+    document.addEventListener('visibilitychange', handleVisibilityChange);
   }
   
   const connectionPromise = attemptConnection();
@@ -220,6 +336,9 @@ export function createChatStream(data, callbacks, options = {}) {
   return {
     promise: connectionPromise,
     abort: () => {
+      console.log('主动取消SSE连接');
+      isAborted = true;
+      cleanup();
       abortController.abort();
     }
   };
