@@ -260,6 +260,7 @@
             <el-option value="deepseek" label="DeepSeek" />
             <el-option value="qianwen" label="千问" />
             <el-option value="glm" label="智谱GLM" />
+            <el-option value="kimi" label="Kimi" />
             <el-option value="oneapi" label="OneAPI" />
           </el-select>
         </el-form-item>

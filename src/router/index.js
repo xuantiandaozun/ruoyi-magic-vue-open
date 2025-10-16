@@ -90,12 +90,33 @@ export const constantRoutes = [
     path: '/ai',
     component: Layout,
     redirect: '/ai/chat',
+    name: 'Ai',
+    meta: { title: 'AI助手', icon: 'robot' },
     children: [
       {
         path: 'chat',
         component: () => import('@/views/ai/chat'),
         name: 'AiChat',
-        meta: { title: 'AI助手' }
+        meta: { title: 'AI对话', icon: 'chat' }
+      },
+      {
+        path: 'workflow',
+        component: () => import('@/views/ai/workflow'),
+        name: 'AiWorkflow',
+        meta: { title: '工作流管理', icon: 'workflow' }
+      },
+      {
+        path: 'workflowStep',
+        component: () => import('@/views/ai/workflowStep'),
+        name: 'AiWorkflowStep',
+        hidden: true,
+        meta: { title: '工作流步骤', activeMenu: '/ai/workflow' }
+      },
+      {
+        path: 'workflowExecution',
+        component: () => import('@/views/ai/workflowExecution'),
+        name: 'AiWorkflowExecution',
+        meta: { title: '工作流执行', icon: 'play' }
       }
     ]
   }
