@@ -31,11 +31,13 @@
           <el-option label="禁用" value="0" />
         </el-select>
       </el-form-item>
-      <el-form-item label="工具类型" prop="toolType">
-        <el-select v-model="queryParams.toolType" placeholder="请选择工具类型" clearable>
+      <el-form-item label="工具类型" prop="toolTypes">
+        <el-select v-model="queryParams.toolTypes" placeholder="请选择工具类型" clearable>
           <el-option label="GitHub趋势查询" value="github_trending" />
           <el-option label="数据库查询" value="database_query" />
-          <el-option label="文件操作" value="file_operation" />
+          <el-option label="博客保存" value="blog_save" />
+          <el-option label="英文博客保存" value="blog_en_save" />
+          <el-option label="自媒体文章保存" value="social_media_article_save" />
         </el-select>
       </el-form-item>
       <el-form-item label="工具状态" prop="toolEnabled">
@@ -121,9 +123,18 @@
           <span v-else class="text-gray-400">未设置</span>
         </template>
       </el-table-column>
-      <el-table-column label="工具类型" align="center" prop="toolType" width="120">
+      <el-table-column label="工具类型" align="center" prop="toolTypes" width="200">
         <template #default="scope">
-          <el-tag v-if="scope.row.toolType" type="info" size="small">{{ scope.row.toolType }}</el-tag>
+          <div v-if="scope.row.toolTypes" class="flex flex-wrap gap-1">
+            <el-tag 
+              v-for="toolType in scope.row.toolTypes.split(',')" 
+              :key="toolType.trim()" 
+              type="info" 
+              size="small"
+            >
+              {{ getToolTypeName(toolType.trim()) }}
+            </el-tag>
+          </div>
           <span v-else class="text-gray-400">无</span>
         </template>
       </el-table-column>
@@ -289,22 +300,36 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="工具类型" prop="toolType" v-if="form.toolEnabled === 'Y'">
-              <el-select v-model="form.toolType" placeholder="请选择工具类型" style="width: 100%">
+            <el-form-item label="工具类型" prop="toolTypes" v-if="form.toolEnabled === 'Y'">
+              <el-select 
+                v-model="form.toolTypesArray" 
+                placeholder="请选择工具类型（可多选）" 
+                style="width: 100%"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+                @change="handleToolTypesChange"
+              >
                 <el-option label="GitHub趋势查询" value="github_trending" />
                 <el-option label="数据库查询" value="database_query" />
-                <el-option label="文件操作" value="file_operation" />
+                <el-option label="博客保存" value="blog_save" />
+                <el-option label="英文博客保存" value="blog_en_save" />
+                <el-option label="自媒体文章保存" value="social_media_article_save" />
               </el-select>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="工具说明" v-if="form.toolEnabled === 'Y' && form.toolType">
-          <el-alert 
-            :title="getToolDescription(form.toolType)" 
-            type="info" 
-            :closable="false"
-            show-icon
-          />
+        <el-form-item label="工具说明" v-if="form.toolEnabled === 'Y' && form.toolTypesArray && form.toolTypesArray.length > 0">
+          <div class="space-y-2">
+            <el-alert 
+              v-for="toolType in form.toolTypesArray"
+              :key="toolType"
+              :title="`${getToolTypeName(toolType)}: ${getToolDescription(toolType)}`"
+              type="info" 
+              :closable="false"
+              show-icon
+            />
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -350,11 +375,23 @@
           <span v-else class="text-gray-400">未配置</span>
         </el-descriptions-item>
         <el-descriptions-item label="工具类型">
-          <el-tag v-if="detailForm.toolType" type="primary">{{ getToolTypeName(detailForm.toolType) }}</el-tag>
+          <div v-if="detailForm.toolTypes" class="flex flex-wrap gap-1">
+            <el-tag 
+              v-for="toolType in detailForm.toolTypes.split(',')" 
+              :key="toolType.trim()" 
+              type="primary"
+            >
+              {{ getToolTypeName(toolType.trim()) }}
+            </el-tag>
+          </div>
           <span v-else class="text-gray-400">无</span>
         </el-descriptions-item>
-        <el-descriptions-item label="工具说明" v-if="detailForm.toolType">
-          {{ getToolDescription(detailForm.toolType) }}
+        <el-descriptions-item label="工具说明" v-if="detailForm.toolTypes" :span="2">
+          <div class="space-y-2">
+            <div v-for="toolType in detailForm.toolTypes.split(',')" :key="toolType.trim()">
+              <strong>{{ getToolTypeName(toolType.trim()) }}:</strong> {{ getToolDescription(toolType.trim()) }}
+            </div>
+          </div>
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -396,7 +433,7 @@ const data = reactive({
     workflowId: null,
     stepName: null,
     enabled: null,
-    toolType: null,
+    toolTypes: null,
     toolEnabled: null,
   },
   rules: {
@@ -410,7 +447,7 @@ const data = reactive({
       { required: true, message: "模型配置不能为空", trigger: "change" }
     ],
     inputVariable: [
-      { required: true, message: "输入变量名不能为空", trigger: "blur" }
+      // 输入变量名改为非必填，特别是对于第一步
     ],
     outputVariable: [
       { required: true, message: "输出变量名不能为空", trigger: "blur" }
@@ -491,7 +528,8 @@ function reset() {
     enabled: "1",
     status: "0",
     configJson: null,
-    toolType: null,
+    toolTypes: null,
+    toolTypesArray: [],
     toolEnabled: "N"
   };
   proxy.resetForm("stepRef");
@@ -529,6 +567,12 @@ function handleUpdate(row) {
   const _id = row.id || ids.value
   getWorkflowStep(_id).then(response => {
     form.value = response;
+    // 处理工具类型数组
+    if (form.value.toolTypes) {
+      form.value.toolTypesArray = form.value.toolTypes.split(',').map(type => type.trim());
+    } else {
+      form.value.toolTypesArray = [];
+    }
     open.value = true;
     title.value = "修改工作流步骤";
   });
@@ -612,7 +656,9 @@ function getToolTypeName(toolType) {
   const typeNames = {
     'github_trending': 'GitHub趋势查询',
     'database_query': '数据库查询',
-    'file_operation': '文件操作'
+    'blog_save': '博客保存',
+    'blog_en_save': '英文博客保存',
+    'social_media_article_save': '社交媒体文章保存'
   };
   return typeNames[toolType] || toolType;
 }
@@ -622,7 +668,9 @@ function getToolDescription(toolType) {
   const descriptions = {
     'github_trending': '🔍 GitHub趋势查询工具：AI会智能分析用户需求，自动确定查询的编程语言、时间范围等参数，获取最新的GitHub趋势项目信息。',
     'database_query': '💾 数据库查询工具：AI会根据用户的查询需求，自动生成并执行合适的SQL语句，无需手动编写查询语句。',
-    'file_operation': '📁 文件操作工具：AI会智能识别文件操作需求，自动处理文件路径、操作类型等参数，执行读取、写入、删除等文件操作。'
+    'blog_save': '📝 博客保存工具：AI会智能识别博客内容，自动处理标题、内容、标签等信息，保存到博客系统中。',
+    'blog_en_save': '📝 英文博客保存工具：AI会智能识别英文博客内容，自动处理标题、内容、标签等信息，保存到英文博客系统中。',
+    'social_media_article_save': '📱 社交媒体文章保存工具：AI会智能识别社交媒体文章内容，自动处理标题、内容、平台信息等，保存到社交媒体管理系统中。'
   };
   return descriptions[toolType] || '🤖 智能工具：该工具将由AI根据上下文自动调用，所有参数都由AI智能决定，无需人工配置。';
 }
@@ -665,6 +713,12 @@ function autoValidateUserPrompt() {
   } else {
     promptValidationResult.value = null;
   }
+}
+
+/** 处理工具类型数组变化 */
+function handleToolTypesChange(value) {
+  // 将数组转换为逗号分隔的字符串存储到 toolTypes 字段
+  form.value.toolTypes = value && value.length > 0 ? value.join(',') : null;
 }
 
 /** 显示变量帮助信息 */

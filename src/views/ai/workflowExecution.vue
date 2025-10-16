@@ -378,9 +378,14 @@ const data = reactive({
       { required: true, message: "请选择工作流", trigger: "change" }
     ],
     inputParams: [
-      { required: true, message: "输入参数不能为空", trigger: "blur" },
+      // 输入参数改为非必填，允许为空
       { 
         validator: (rule, value, callback) => {
+          // 如果值为空，直接通过验证
+          if (!value || value.trim() === '') {
+            callback();
+            return;
+          }
           try {
             JSON.parse(value);
             callback();
@@ -493,7 +498,7 @@ function generateInputFields(firstStep) {
             label: key,
             type: 'text', // 默认为文本类型
             placeholder: `请输入${key}`,
-            required: true
+            required: false // 改为非必填
           };
           
           // 根据值的类型推断输入类型
@@ -528,7 +533,7 @@ function generateInputFields(firstStep) {
               label: key,
               type: 'text',
               placeholder: `请输入${key}`,
-              required: true
+              required: false // 改为非必填
             };
             inputFields.value.push(field);
             executionForm.value.dynamicInputs[key] = '';
