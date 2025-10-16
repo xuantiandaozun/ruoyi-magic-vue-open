@@ -59,3 +59,15 @@ export function toggleWorkflowStepStatus(id) {
     method: 'put'
   })
 }
+
+// 验证用户提示词中的变量
+export function validatePromptVariables(userPrompt) {
+  return request({
+    url: '/ai/workflow/step/validatePromptVariables',
+    method: 'post',
+    data: userPrompt,
+    headers: {
+      'Content-Type': 'text/plain'
+    }
+  })
+}

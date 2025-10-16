@@ -60,3 +60,11 @@ export function delWorkflowExecution(ids) {
     method: 'delete'
   })
 }
+
+// 获取工作流的变量信息
+export function getWorkflowVariables(workflowId) {
+  return request({
+    url: `/ai/workflow/execution/variables/${workflowId}`,
+    method: 'get'
+  })
+}

@@ -113,6 +113,14 @@
       </el-table-column>
       <el-table-column label="输入变量" align="center" prop="inputVariable" width="120" />
       <el-table-column label="输出变量" align="center" prop="outputVariable" width="120" />
+      <el-table-column label="用户提示词" align="center" prop="userPrompt" width="200" :show-overflow-tooltip="true">
+        <template #default="scope">
+          <span v-if="scope.row.userPrompt" class="text-sm">
+            {{ scope.row.userPrompt.length > 50 ? scope.row.userPrompt.substring(0, 50) + '...' : scope.row.userPrompt }}
+          </span>
+          <span v-else class="text-gray-400">未设置</span>
+        </template>
+      </el-table-column>
       <el-table-column label="工具类型" align="center" prop="toolType" width="120">
         <template #default="scope">
           <el-tag v-if="scope.row.toolType" type="info" size="small">{{ scope.row.toolType }}</el-tag>
@@ -214,6 +222,40 @@
         <el-form-item label="系统提示词" prop="systemPrompt">
           <el-input v-model="form.systemPrompt" type="textarea" :rows="4" placeholder="请输入系统提示词" />
         </el-form-item>
+        <el-form-item label="用户提示词" prop="userPrompt">
+          <div class="flex gap-2 mb-2">
+            <el-button size="small" type="primary" plain @click="validateUserPrompt" :loading="validatingPrompt">
+              验证变量
+            </el-button>
+            <el-button size="small" type="success" plain @click="showVariableHelp">
+              变量帮助
+            </el-button>
+          </div>
+          <el-input 
+            v-model="form.userPrompt" 
+            type="textarea" 
+            :rows="4" 
+            placeholder="请输入用户提示词，支持变量占位符，如：请帮我整理下面的文案{{userInput}}"
+            @blur="autoValidateUserPrompt"
+          />
+          <div class="mt-2 text-sm" v-if="promptValidationResult">
+            <div v-if="promptValidationResult.isValid" class="text-green-600">
+              ✅ 变量验证通过
+              <span v-if="promptValidationResult.variables.length > 0">
+                - 发现变量: {{ promptValidationResult.variables.join(', ') }}
+              </span>
+            </div>
+            <div v-else class="text-red-600">
+              ❌ 变量验证失败
+              <span v-if="promptValidationResult.missingVariables.length > 0">
+                - 缺失变量: {{ promptValidationResult.missingVariables.join(', ') }}
+              </span>
+            </div>
+          </div>
+          <div class="mt-1 text-xs text-gray-500">
+            提示：使用 {{变量名}} 格式定义变量，如 {{userInput}}、{{fileName}} 等
+          </div>
+        </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status">
             <el-radio label="0">正常</el-radio>
@@ -225,7 +267,15 @@
         </el-form-item>
         
         <!-- 工具配置区域 -->
-        <el-divider content-position="left">工具配置</el-divider>
+        <el-divider content-position="left">智能工具配置</el-divider>
+        <el-alert 
+          title="💡 智能提示" 
+          description="工具参数将由AI根据上下文自动决定，您只需选择合适的工具类型即可。AI会智能分析用户需求并自动配置所有必要参数。"
+          type="success" 
+          :closable="false"
+          show-icon
+          style="margin-bottom: 20px;"
+        />
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="启用工具" prop="toolEnabled">
@@ -248,36 +298,13 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="工具参数" prop="toolParameters" v-if="form.toolEnabled === 'Y' && form.toolType">
-          <div class="flex gap-2 mb-2">
-            <el-button size="small" type="primary" plain @click="applyToolParameterTemplate">
-              使用模板
-            </el-button>
-            <el-button size="small" type="success" plain @click="formatToolParameters">
-              格式化JSON
-            </el-button>
-          </div>
-          <el-input 
-            v-model="form.toolParameters" 
-            type="textarea" 
-            :rows="6" 
-            placeholder="请输入工具参数JSON，例如：{&quot;language&quot;: &quot;all&quot;, &quot;limit&quot;: 10}"
-            @blur="validateToolParametersInput"
+        <el-form-item label="工具说明" v-if="form.toolEnabled === 'Y' && form.toolType">
+          <el-alert 
+            :title="getToolDescription(form.toolType)" 
+            type="info" 
+            :closable="false"
+            show-icon
           />
-          <div class="mt-2 text-sm" :class="toolParametersValid ? 'text-gray-500' : 'text-red-500'">
-            <template v-if="!toolParametersValid">
-              ❌ JSON格式错误，请检查参数格式
-            </template>
-            <template v-else-if="form.toolType === 'github_trending'">
-              ✅ GitHub趋势查询参数：language(语言), limit(数量限制)
-            </template>
-            <template v-else-if="form.toolType === 'database_query'">
-              ✅ 数据库查询参数：sql(查询语句), limit(结果限制)
-            </template>
-            <template v-else-if="form.toolType === 'file_operation'">
-              ✅ 文件操作参数：action(操作类型), path(文件路径)
-            </template>
-          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -311,6 +338,9 @@
         <el-descriptions-item label="系统提示词" :span="2" v-if="detailForm.systemPrompt">
           <pre style="white-space: pre-wrap; word-break: break-all;">{{ detailForm.systemPrompt }}</pre>
         </el-descriptions-item>
+        <el-descriptions-item label="用户提示词" :span="2" v-if="detailForm.userPrompt">
+          <pre style="white-space: pre-wrap; word-break: break-all; background: #f0f9ff; padding: 10px; border-radius: 4px; border-left: 4px solid #3b82f6;">{{ detailForm.userPrompt }}</pre>
+        </el-descriptions-item>
         <el-descriptions-item label="配置JSON" :span="2" v-if="detailForm.configJson">
           <pre style="white-space: pre-wrap; word-break: break-all;">{{ detailForm.configJson }}</pre>
         </el-descriptions-item>
@@ -323,8 +353,8 @@
           <el-tag v-if="detailForm.toolType" type="primary">{{ getToolTypeName(detailForm.toolType) }}</el-tag>
           <span v-else class="text-gray-400">无</span>
         </el-descriptions-item>
-        <el-descriptions-item label="工具参数" :span="2" v-if="detailForm.toolParameters">
-          <pre style="white-space: pre-wrap; word-break: break-all; background: #f5f5f5; padding: 10px; border-radius: 4px;">{{ formatJsonDisplay(detailForm.toolParameters) }}</pre>
+        <el-descriptions-item label="工具说明" v-if="detailForm.toolType">
+          {{ getToolDescription(detailForm.toolType) }}
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -332,7 +362,7 @@
 </template>
 
 <script setup name="AiWorkflowStep">
-import { listWorkflowSteps, listStepsByWorkflowId, getWorkflowStep, delWorkflowStep, addWorkflowStep, updateWorkflowStep, toggleWorkflowStepStatus } from "@/api/ai/workflowStep";
+import { listWorkflowSteps, listStepsByWorkflowId, getWorkflowStep, delWorkflowStep, addWorkflowStep, updateWorkflowStep, toggleWorkflowStepStatus, validatePromptVariables } from "@/api/ai/workflowStep";
 import { getWorkflow } from "@/api/ai/workflow";
 import { listModelConfigs } from "@/api/ai/modelConfig";
 import { getAvailableChatModels } from "@/api/ai/chat";
@@ -354,7 +384,8 @@ const single = ref(true);
 const multiple = ref(true);
 const total = ref(0);
 const title = ref("");
-const toolParametersValid = ref(true);
+const validatingPrompt = ref(false);
+const promptValidationResult = ref(null);
 
 const data = reactive({
   form: {},
@@ -454,13 +485,13 @@ function reset() {
     stepOrder: 1,
     modelConfigId: null,
     systemPrompt: null,
+    userPrompt: null,
     inputVariable: null,
     outputVariable: null,
     enabled: "1",
     status: "0",
     configJson: null,
     toolType: null,
-    toolParameters: null,
     toolEnabled: "N"
   };
   proxy.resetForm("stepRef");
@@ -574,62 +605,7 @@ function handleModelConfigChange(row) {
   }
 }
 
-/** 验证工具参数JSON格式 */
-function validateToolParameters(value) {
-  if (!value || value.trim() === '') {
-    return true; // 允许为空
-  }
-  try {
-    JSON.parse(value);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
 
-/** 格式化工具参数JSON */
-function formatToolParameters() {
-  if (form.value.toolParameters) {
-    try {
-      const parsed = JSON.parse(form.value.toolParameters);
-      form.value.toolParameters = JSON.stringify(parsed, null, 2);
-    } catch (error) {
-      proxy.$modal.msgError("JSON格式错误，请检查参数格式");
-    }
-  }
-}
-
-/** 获取工具参数模板 */
-function getToolParameterTemplate(toolType) {
-  const templates = {
-    'github_trending': {
-      language: 'all',
-      limit: 10
-    },
-    'database_query': {
-      sql: 'SELECT * FROM table',
-      limit: 100
-    },
-    'file_operation': {
-      action: 'read',
-      path: '/path/to/file'
-    }
-  };
-  return JSON.stringify(templates[toolType] || {}, null, 2);
-}
-
-/** 应用工具参数模板 */
-function applyToolParameterTemplate() {
-  if (form.value.toolType) {
-    form.value.toolParameters = getToolParameterTemplate(form.value.toolType);
-    toolParametersValid.value = true;
-  }
-}
-
-/** 验证工具参数输入 */
-function validateToolParametersInput() {
-  toolParametersValid.value = validateToolParameters(form.value.toolParameters);
-}
 
 /** 获取工具类型显示名称 */
 function getToolTypeName(toolType) {
@@ -641,20 +617,77 @@ function getToolTypeName(toolType) {
   return typeNames[toolType] || toolType;
 }
 
-/** 格式化JSON显示 */
-function formatJsonDisplay(jsonString) {
-  if (!jsonString) return '';
-  try {
-    const parsed = JSON.parse(jsonString);
-    return JSON.stringify(parsed, null, 2);
-  } catch (error) {
-    return jsonString; // 如果解析失败，返回原字符串
-  }
+/** 获取工具描述信息 */
+function getToolDescription(toolType) {
+  const descriptions = {
+    'github_trending': '🔍 GitHub趋势查询工具：AI会智能分析用户需求，自动确定查询的编程语言、时间范围等参数，获取最新的GitHub趋势项目信息。',
+    'database_query': '💾 数据库查询工具：AI会根据用户的查询需求，自动生成并执行合适的SQL语句，无需手动编写查询语句。',
+    'file_operation': '📁 文件操作工具：AI会智能识别文件操作需求，自动处理文件路径、操作类型等参数，执行读取、写入、删除等文件操作。'
+  };
+  return descriptions[toolType] || '🤖 智能工具：该工具将由AI根据上下文自动调用，所有参数都由AI智能决定，无需人工配置。';
 }
+
+
 
 /** 返回工作流列表 */
 function goBack() {
   router.push('/ai/workflow');
+}
+
+/** 验证用户提示词中的变量 */
+async function validateUserPrompt() {
+  if (!form.value.userPrompt || form.value.userPrompt.trim() === '') {
+    promptValidationResult.value = null;
+    return;
+  }
+  
+  validatingPrompt.value = true;
+  try {
+    const response = await validatePromptVariables(form.value.userPrompt);
+    promptValidationResult.value = {
+      isValid: response.code === 200,
+      variables: response.data?.variableNames || [],
+      missingVariables: response.data?.missingVariables || []
+    };
+  } catch (error) {
+    console.error('变量验证失败:', error);
+    proxy.$modal.msgError('变量验证失败，请检查网络连接');
+    promptValidationResult.value = null;
+  } finally {
+    validatingPrompt.value = false;
+  }
+}
+
+/** 自动验证用户提示词（失焦时触发） */
+function autoValidateUserPrompt() {
+  if (form.value.userPrompt && form.value.userPrompt.trim() !== '') {
+    validateUserPrompt();
+  } else {
+    promptValidationResult.value = null;
+  }
+}
+
+/** 显示变量帮助信息 */
+function showVariableHelp() {
+  proxy.$modal.alert(`
+    <div style="text-align: left;">
+      <h4>变量使用说明：</h4>
+      <p>1. 使用双大括号包围变量名：<code>{{变量名}}</code></p>
+      <p>2. 变量名只能包含字母、数字和下划线</p>
+      <p>3. 常用变量示例：</p>
+      <ul>
+        <li><code>{{userInput}}</code> - 用户输入内容</li>
+        <li><code>{{fileName}}</code> - 文件名</li>
+        <li><code>{{content}}</code> - 文本内容</li>
+        <li><code>{{previousOutput}}</code> - 上一步输出</li>
+      </ul>
+      <p>4. 示例提示词：</p>
+      <p><code>请帮我整理下面的文案：{{userInput}}</code></p>
+    </div>
+  `, '变量使用帮助', {
+    dangerouslyUseHTMLString: true,
+    confirmButtonText: '知道了'
+  });
 }
 
 onMounted(() => {

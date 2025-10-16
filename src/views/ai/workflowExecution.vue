@@ -24,44 +24,67 @@
             
             <!-- 动态输入字段 -->
             <div v-if="inputFields.length > 0" class="dynamic-inputs">
-              <el-divider content-position="left">输入参数</el-divider>
+              <el-divider content-position="left">
+                <span>输入参数</span>
+                <el-button size="small" type="text" @click="showVariableHelp" class="ml-2">
+                  <el-icon><QuestionFilled /></el-icon>
+                  变量说明
+                </el-button>
+              </el-divider>
               <el-form-item 
                 v-for="field in inputFields" 
                 :key="field.key" 
-                :label="field.label" 
                 :prop="`dynamicInputs.${field.key}`"
                 :rules="field.required ? [{ required: true, message: `${field.label}不能为空`, trigger: 'blur' }] : []"
               >
+                <template #label>
+                  <div class="flex items-center">
+                    <span>{{ field.label }}</span>
+                    <el-tag v-if="field.required" type="danger" size="small" class="ml-1">必填</el-tag>
+                    <el-tag v-if="field.fromStep" type="info" size="small" class="ml-1">来自步骤: {{ field.fromStep }}</el-tag>
+                  </div>
+                </template>
+                
                 <!-- 文本输入 -->
                 <el-input
                   v-if="field.type === 'text'"
                   v-model="executionForm.dynamicInputs[field.key]"
-                  :placeholder="field.placeholder"
+                  :placeholder="field.placeholder || `请输入${field.label}`"
                   @input="handleDynamicInputChange"
+                  clearable
                 />
                 <!-- 数字输入 -->
                 <el-input-number
                   v-else-if="field.type === 'number'"
                   v-model="executionForm.dynamicInputs[field.key]"
-                  :placeholder="field.placeholder"
+                  :placeholder="field.placeholder || `请输入${field.label}`"
                   style="width: 100%"
                   @change="handleDynamicInputChange"
                 />
                 <!-- 开关输入 -->
-                <el-switch
-                  v-else-if="field.type === 'switch'"
-                  v-model="executionForm.dynamicInputs[field.key]"
-                  @change="handleDynamicInputChange"
-                />
+                <div v-else-if="field.type === 'switch'" class="flex items-center">
+                  <el-switch
+                    v-model="executionForm.dynamicInputs[field.key]"
+                    @change="handleDynamicInputChange"
+                  />
+                  <span class="ml-2 text-sm text-gray-500">{{ field.description || '开启/关闭此选项' }}</span>
+                </div>
                 <!-- 文本域输入 -->
                 <el-input
                   v-else-if="field.type === 'textarea'"
                   v-model="executionForm.dynamicInputs[field.key]"
                   type="textarea"
-                  :rows="3"
-                  :placeholder="field.placeholder"
+                  :rows="field.rows || 3"
+                  :placeholder="field.placeholder || `请输入${field.label}`"
                   @input="handleDynamicInputChange"
+                  show-word-limit
+                  :maxlength="field.maxLength || 1000"
                 />
+                
+                <!-- 字段描述 -->
+                <div v-if="field.description" class="mt-1 text-xs text-gray-500">
+                  {{ field.description }}
+                </div>
               </el-form-item>
             </div>
             
@@ -92,7 +115,13 @@
           </el-form>
           
           <!-- 执行结果显示 -->
-          <el-divider content-position="left">执行结果</el-divider>
+          <el-divider content-position="left">
+            <span>执行结果</span>
+            <el-button v-if="executionResult" size="small" type="text" @click="copyResult" class="ml-2">
+              <el-icon><CopyDocument /></el-icon>
+              复制结果
+            </el-button>
+          </el-divider>
           <div v-if="executionResult" class="execution-result">
             <el-alert
               :title="executionResult.success ? '执行成功' : '执行失败'"
@@ -100,14 +129,69 @@
               :description="executionResult.message"
               show-icon
               :closable="false"
+              class="mb-4"
             />
-            <div v-if="executionResult.output" class="result-output">
-              <h4>输出结果：</h4>
-              <pre>{{ executionResult.output }}</pre>
+            
+            <!-- 执行统计信息 -->
+            <el-row :gutter="16" class="mb-4" v-if="executionResult.executionId">
+              <el-col :span="8">
+                <el-statistic title="执行ID" :value="executionResult.executionId" />
+              </el-col>
+              <el-col :span="8">
+                <el-statistic title="执行时间" :value="executionResult.executionTime" suffix="ms" />
+              </el-col>
+              <el-col :span="8">
+                <el-statistic title="步骤数量" :value="executionResult.stepCount || 0" />
+              </el-col>
+            </el-row>
+            
+            <!-- 步骤执行详情 -->
+            <div v-if="executionResult.stepResults && executionResult.stepResults.length > 0" class="step-results mb-4">
+              <h4 class="mb-2">步骤执行详情：</h4>
+              <el-timeline>
+                <el-timeline-item
+                  v-for="(step, index) in executionResult.stepResults"
+                  :key="index"
+                  :type="step.success ? 'success' : 'danger'"
+                  :timestamp="step.timestamp"
+                >
+                  <el-card class="step-result-card">
+                    <div class="flex justify-between items-center mb-2">
+                      <h5>{{ step.stepName }}</h5>
+                      <el-tag :type="step.success ? 'success' : 'danger'" size="small">
+                        {{ step.success ? '成功' : '失败' }}
+                      </el-tag>
+                    </div>
+                    <div v-if="step.output" class="step-output">
+                      <p class="text-sm text-gray-600 mb-1">输出结果：</p>
+                      <pre class="step-output-content">{{ step.output }}</pre>
+                    </div>
+                    <div v-if="step.error" class="step-error">
+                      <p class="text-sm text-red-600 mb-1">错误信息：</p>
+                      <pre class="step-error-content">{{ step.error }}</pre>
+                    </div>
+                    <div v-if="step.executionTime" class="text-xs text-gray-500 mt-2">
+                      执行时间: {{ step.executionTime }}ms
+                    </div>
+                  </el-card>
+                </el-timeline-item>
+              </el-timeline>
             </div>
-            <div v-if="executionResult.executionId" class="execution-info">
-              <p><strong>执行ID：</strong>{{ executionResult.executionId }}</p>
-              <p><strong>执行时间：</strong>{{ executionResult.executionTime }}ms</p>
+            
+            <!-- 最终输出结果 -->
+            <div v-if="executionResult.output" class="result-output">
+              <h4 class="mb-2">最终输出结果：</h4>
+              <el-card class="output-card">
+                <pre class="result-output-content">{{ executionResult.output }}</pre>
+              </el-card>
+            </div>
+            
+            <!-- 错误信息 -->
+            <div v-if="executionResult.error" class="result-error">
+              <h4 class="mb-2">错误信息：</h4>
+              <el-card class="error-card">
+                <pre class="result-error-content">{{ executionResult.error }}</pre>
+              </el-card>
             </div>
           </div>
         </el-card>
@@ -253,7 +337,8 @@
 import { ref, reactive, toRefs, getCurrentInstance, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { parseTime } from '@/utils/ruoyi';
-import { executeWorkflow, quickExecuteWorkflow, listWorkflowExecutions, getWorkflowExecution, delWorkflowExecution } from "@/api/ai/workflowExecution";
+import { CopyDocument, QuestionFilled } from '@element-plus/icons-vue';
+import { executeWorkflow, quickExecuteWorkflow, listWorkflowExecutions, getWorkflowExecution, delWorkflowExecution, getWorkflowVariables } from "@/api/ai/workflowExecution";
 import { getEnabledWorkflows, getWorkflow } from "@/api/ai/workflow";
 import { listStepsByWorkflowId } from "@/api/ai/workflowStep";
 
@@ -645,6 +730,92 @@ function getStatusText(status) {
   return statusMap[status] || '未知';
 }
 
+/** 获取工作流变量信息 */
+async function getWorkflowVariableInfo(workflowId) {
+  try {
+    const response = await getWorkflowVariables(workflowId);
+    return response || [];
+  } catch (error) {
+    console.error('获取工作流变量失败:', error);
+    return [];
+  }
+}
+
+/** 复制执行结果 */
+function copyResult() {
+  if (!executionResult.value) return;
+  
+  let copyText = '';
+  
+  // 添加基本信息
+  copyText += `执行结果: ${executionResult.value.success ? '成功' : '失败'}\n`;
+  copyText += `消息: ${executionResult.value.message}\n`;
+  
+  if (executionResult.value.executionId) {
+    copyText += `执行ID: ${executionResult.value.executionId}\n`;
+  }
+  
+  if (executionResult.value.executionTime) {
+    copyText += `执行时间: ${executionResult.value.executionTime}ms\n`;
+  }
+  
+  // 添加步骤结果
+  if (executionResult.value.stepResults && executionResult.value.stepResults.length > 0) {
+    copyText += '\n步骤执行详情:\n';
+    executionResult.value.stepResults.forEach((step, index) => {
+      copyText += `${index + 1}. ${step.stepName}: ${step.success ? '成功' : '失败'}\n`;
+      if (step.output) {
+        copyText += `   输出: ${step.output}\n`;
+      }
+      if (step.error) {
+        copyText += `   错误: ${step.error}\n`;
+      }
+    });
+  }
+  
+  // 添加最终输出
+  if (executionResult.value.output) {
+    copyText += `\n最终输出:\n${executionResult.value.output}\n`;
+  }
+  
+  // 添加错误信息
+  if (executionResult.value.error) {
+    copyText += `\n错误信息:\n${executionResult.value.error}\n`;
+  }
+  
+  // 复制到剪贴板
+  navigator.clipboard.writeText(copyText).then(() => {
+    proxy.$modal.msgSuccess('执行结果已复制到剪贴板');
+  }).catch(() => {
+    proxy.$modal.msgError('复制失败，请手动复制');
+  });
+}
+
+/** 显示变量帮助 */
+function showVariableHelp() {
+  proxy.$modal.alert(`
+    <div style="text-align: left;">
+      <h4>变量使用说明：</h4>
+      <p>在输入参数中，您可以使用以下格式的变量：</p>
+      <ul>
+        <li><code>{{variable_name}}</code> - 基本变量引用</li>
+        <li><code>{{step_name.output}}</code> - 引用特定步骤的输出</li>
+        <li><code>{{user_input}}</code> - 用户输入变量</li>
+      </ul>
+      <h4>示例：</h4>
+      <pre>{
+  "user_name": "{{user_input}}",
+  "previous_result": "{{step1.output}}",
+  "template": "Hello {{name}}, welcome!"
+}</pre>
+      <p><strong>注意：</strong>变量名区分大小写，请确保变量名与工作流步骤中定义的变量名一致。</p>
+    </div>
+  `, '变量使用帮助', {
+    dangerouslyUseHTMLString: true,
+    confirmButtonText: '知道了'
+  });
+}
+
 onMounted(() => {
   getEnabledWorkflowList();
   getHistoryList();
@@ -727,5 +898,112 @@ onMounted(() => {
 
 .input-tips .el-icon {
   margin-right: 4px;
+}
+
+/* 执行结果相关样式 */
+.step-results {
+  margin: 16px 0;
+}
+
+.step-result-card {
+  margin-bottom: 8px;
+  border-left: 4px solid #409eff;
+}
+
+.step-result-card .el-card__body {
+  padding: 16px;
+}
+
+.step-output-content, .step-error-content {
+  background-color: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.step-error-content {
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.output-card, .error-card {
+  margin-top: 8px;
+}
+
+.result-output-content {
+  background-color: #f0f9ff;
+  padding: 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border: 1px solid #bfdbfe;
+}
+
+.result-error-content {
+  background-color: #fef2f2;
+  padding: 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.mb-2 {
+  margin-bottom: 8px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.ml-2 {
+  margin-left: 8px;
+}
+
+.flex {
+  display: flex;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.text-sm {
+  font-size: 14px;
+}
+
+.text-xs {
+  font-size: 12px;
+}
+
+.text-gray-600 {
+  color: #6b7280;
+}
+
+.text-gray-500 {
+  color: #9ca3af;
+}
+
+.text-red-600 {
+  color: #dc2626;
 }
 </style>
