@@ -117,6 +117,13 @@ export const constantRoutes = [
         component: () => import('@/views/ai/workflowExecution'),
         name: 'AiWorkflowExecution',
         meta: { title: '工作流执行', icon: 'play' }
+      },
+      {
+        path: 'workflow-schedule-log',
+        component: () => import('@/views/ai/workflowScheduleLog'),
+        name: 'AiWorkflowScheduleLog',
+        hidden: true,
+        meta: { title: '定时任务日志', activeMenu: '/ai/workflow' }
       }
     ]
   }

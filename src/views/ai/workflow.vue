@@ -251,16 +251,15 @@
           <el-table-column label="Cron表达式" prop="cronExpression" />
           <el-table-column label="状态" align="center">
             <template #default="scope">
-              <el-tag v-if="scope.row.status === 'RUNNING'" type="success">运行中</el-tag>
-              <el-tag v-else-if="scope.row.status === 'PAUSED'" type="warning">已暂停</el-tag>
-              <el-tag v-else-if="scope.row.status === 'STOPPED'" type="danger">已停止</el-tag>
+              <el-tag v-if="scope.row.status === '0'" type="success">正常</el-tag>
+              <el-tag v-else-if="scope.row.status === '1'" type="warning">暂停</el-tag>
               <el-tag v-else type="info">{{ scope.row.status }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column label="启用状态" align="center">
             <template #default="scope">
-              <el-tag :type="scope.row.enabled === 1 ? 'success' : 'danger'">
-                {{ scope.row.enabled === 1 ? '启用' : '禁用' }}
+              <el-tag :type="scope.row.enabled === 'Y' ? 'success' : 'danger'">
+                {{ scope.row.enabled === 'Y' ? '启用' : '禁用' }}
               </el-tag>
             </template>
           </el-table-column>
@@ -277,9 +276,9 @@
           <el-table-column label="操作" align="center" width="380">
             <template #default="scope">
               <el-button link type="primary" icon="Edit" @click="handleUpdateSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">修改</el-button>
-              <el-button v-if="scope.row.status === 'PAUSED'" link type="success" icon="VideoPlay" @click="handleStartSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">启动</el-button>
-              <el-button v-if="scope.row.status === 'RUNNING'" link type="warning" icon="VideoPause" @click="handlePauseSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">暂停</el-button>
-              <el-button v-if="scope.row.status === 'PAUSED'" link type="info" icon="Refresh" @click="handleResumeSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">恢复</el-button>
+              <el-button v-if="scope.row.status === '1'" link type="success" icon="VideoPlay" @click="handleStartSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">启动</el-button>
+              <el-button v-if="scope.row.status === '0'" link type="warning" icon="VideoPause" @click="handlePauseSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">暂停</el-button>
+              <el-button v-if="scope.row.status === '1'" link type="info" icon="Refresh" @click="handleResumeSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">恢复</el-button>
               <el-button link type="primary" icon="CaretRight" @click="handleExecuteSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:execute']">立即执行</el-button>
               <el-button link type="info" icon="Document" @click="handleViewScheduleLogs(scope.row)" v-hasPermi="['ai:workflow:schedule:log:list']">日志</el-button>
               <el-button link type="danger" icon="Delete" @click="handleDeleteSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:remove']">删除</el-button>
@@ -424,7 +423,20 @@ const scheduleStatistics = ref({});
 const data = reactive({
   form: {},
   detailForm: {},
-  scheduleForm: {},
+  scheduleForm: {
+    scheduleId: null,
+    workflowId: null,
+    scheduleName: null,
+    cronExpression: null,
+    description: null,
+    enabled: 1,
+    misfirePolicy: 1,
+    concurrent: 0,
+    retryCount: 0,
+    executionTimeout: 3600,
+    priority: 5,
+    inputData: null
+  },
   queryParams: {
     pageNum: 1,
     pageSize: 10,
@@ -494,6 +506,25 @@ function reset() {
     configJson: null
   };
   proxy.resetForm("workflowRef");
+}
+
+// 定时任务表单重置
+function resetScheduleForm() {
+  scheduleForm.value = {
+    scheduleId: null,
+    workflowId: null,
+    scheduleName: null,
+    cronExpression: null,
+    description: null,
+    enabled: 1,
+    misfirePolicy: 1,
+    concurrent: 0,
+    retryCount: 0,
+    executionTimeout: 3600,
+    priority: 5,
+    inputData: null
+  };
+  proxy.resetForm("scheduleRef");
 }
 
 /** 搜索按钮操作 */
@@ -599,8 +630,8 @@ function handleSchedule(row) {
 /** 获取定时任务列表 */
 function getScheduleList() {
   scheduleLoading.value = true;
-  getWorkflowSchedules(currentWorkflow.value.workflowId).then(response => {
-    scheduleList.value = response.data;
+  getWorkflowSchedules(currentWorkflow.value.id).then(response => {
+    scheduleList.value = response;
     scheduleLoading.value = false;
   }).catch(() => {
     scheduleLoading.value = false;
@@ -609,28 +640,36 @@ function getScheduleList() {
 
 /** 获取定时任务统计信息 */
 function getScheduleStats() {
-  getWorkflowScheduleStatistics(currentWorkflow.value.workflowId).then(response => {
-    scheduleStatistics.value = response.data;
+  getWorkflowScheduleStatistics(currentWorkflow.value.id).then(response => {
+    scheduleStatistics.value = response;
   });
 }
 
 /** 新增定时任务 */
 function handleAddSchedule() {
-  reset();
-  scheduleForm.value.workflowId = currentWorkflow.value.workflowId;
-  scheduleForm.value.enabled = 1;
-  scheduleForm.value.misfirePolicy = 1;
-  scheduleForm.value.concurrent = 0;
-  scheduleForm.value.retryCount = 0;
-  scheduleForm.value.executionTimeout = 3600;
-  scheduleForm.value.priority = 5;
+  resetScheduleForm();
+  scheduleForm.value.workflowId = currentWorkflow.value.id;
   scheduleFormOpen.value = true;
 }
 
 /** 修改定时任务 */
 function handleUpdateSchedule(row) {
-  reset();
-  scheduleForm.value = { ...row };
+  resetScheduleForm();
+  // 映射后端返回的字段到表单字段
+  scheduleForm.value = {
+    scheduleId: row.id,
+    workflowId: row.workflowId,
+    scheduleName: row.scheduleName,
+    cronExpression: row.cronExpression,
+    description: row.remark, // 后端使用remark字段作为描述
+    enabled: row.enabled === 'Y' ? 1 : 0, // 后端使用Y/N，前端表单使用1/0
+    misfirePolicy: parseInt(row.misfirePolicy) || 1,
+    concurrent: row.concurrent === 'Y' ? 1 : 0, // 后端使用Y/N，前端表单使用1/0
+    retryCount: row.retryCount || 0,
+    executionTimeout: row.executionTimeout || 3600,
+    priority: row.priority || 5,
+    inputData: row.inputDataTemplate
+  };
   scheduleFormOpen.value = true;
 }
 
@@ -638,15 +677,31 @@ function handleUpdateSchedule(row) {
 function submitScheduleForm() {
   proxy.$refs["scheduleRef"].validate(valid => {
     if (valid) {
+      // 转换前端表单数据为后端期望的格式
+      const submitData = {
+        id: scheduleForm.value.scheduleId,
+        workflowId: scheduleForm.value.workflowId,
+        scheduleName: scheduleForm.value.scheduleName,
+        cronExpression: scheduleForm.value.cronExpression,
+        remark: scheduleForm.value.description,
+        enabled: scheduleForm.value.enabled === 1 ? 'Y' : 'N',
+        misfirePolicy: String(scheduleForm.value.misfirePolicy),
+        concurrent: scheduleForm.value.concurrent === 1 ? 'Y' : 'N',
+        retryCount: scheduleForm.value.retryCount,
+        executionTimeout: scheduleForm.value.executionTimeout,
+        priority: scheduleForm.value.priority,
+        inputDataTemplate: scheduleForm.value.inputData
+      };
+
       if (scheduleForm.value.scheduleId != null) {
-        updateSchedule(scheduleForm.value).then(response => {
+        updateSchedule(submitData).then(response => {
           proxy.$modal.msgSuccess("修改成功");
           scheduleFormOpen.value = false;
           getScheduleList();
           getScheduleStats();
         });
       } else {
-        createWorkflowSchedule(scheduleForm.value).then(response => {
+        createWorkflowSchedule(currentWorkflow.value.id, submitData).then(response => {
           proxy.$modal.msgSuccess("新增成功");
           scheduleFormOpen.value = false;
           getScheduleList();
@@ -660,7 +715,7 @@ function submitScheduleForm() {
 /** 删除定时任务 */
 function handleDeleteSchedule(row) {
   proxy.$modal.confirm('是否确认删除定时任务"' + row.scheduleName + '"？').then(function() {
-    return delSchedule(row.scheduleId);
+    return delSchedule(row.id);
   }).then(() => {
     getScheduleList();
     getScheduleStats();
@@ -670,7 +725,7 @@ function handleDeleteSchedule(row) {
 
 /** 启动定时任务 */
 function handleStartSchedule(row) {
-  startSchedule(row.scheduleId).then(() => {
+  startSchedule(row.id).then(() => {
     proxy.$modal.msgSuccess("启动成功");
     getScheduleList();
     getScheduleStats();
@@ -679,7 +734,7 @@ function handleStartSchedule(row) {
 
 /** 暂停定时任务 */
 function handlePauseSchedule(row) {
-  pauseSchedule(row.scheduleId).then(() => {
+  pauseSchedule(row.id).then(() => {
     proxy.$modal.msgSuccess("暂停成功");
     getScheduleList();
     getScheduleStats();
@@ -688,7 +743,7 @@ function handlePauseSchedule(row) {
 
 /** 恢复定时任务 */
 function handleResumeSchedule(row) {
-  resumeSchedule(row.scheduleId).then(() => {
+  resumeSchedule(row.id).then(() => {
     proxy.$modal.msgSuccess("恢复成功");
     getScheduleList();
     getScheduleStats();
@@ -697,7 +752,7 @@ function handleResumeSchedule(row) {
 
 /** 立即执行定时任务 */
 function handleExecuteSchedule(row) {
-  executeScheduleOnce(row.scheduleId).then(() => {
+  executeScheduleOnce(row.id).then(() => {
     proxy.$modal.msgSuccess("执行成功");
     getScheduleList();
   });
@@ -705,7 +760,7 @@ function handleExecuteSchedule(row) {
 
 /** 启用所有定时任务 */
 function handleEnableAllSchedules() {
-  enableAllWorkflowSchedules(currentWorkflow.value.workflowId).then(() => {
+  enableAllWorkflowSchedules(currentWorkflow.value.id).then(() => {
     proxy.$modal.msgSuccess("启用成功");
     getScheduleList();
     getScheduleStats();
@@ -714,7 +769,7 @@ function handleEnableAllSchedules() {
 
 /** 禁用所有定时任务 */
 function handleDisableAllSchedules() {
-  disableAllWorkflowSchedules(currentWorkflow.value.workflowId).then(() => {
+  disableAllWorkflowSchedules(currentWorkflow.value.id).then(() => {
     proxy.$modal.msgSuccess("禁用成功");
     getScheduleList();
     getScheduleStats();
@@ -724,7 +779,7 @@ function handleDisableAllSchedules() {
 /** 取消定时任务表单 */
 function cancelSchedule() {
   scheduleFormOpen.value = false;
-  reset();
+  resetScheduleForm();
 }
 
 /** 关闭定时任务管理对话框 */
@@ -739,7 +794,7 @@ function closeScheduleDialog() {
 function handleViewLogs() {
   proxy.$router.push({ 
     path: '/ai/workflow-schedule-log', 
-    query: { workflowId: currentWorkflow.value.workflowId } 
+    query: { workflowId: currentWorkflow.value.id } 
   });
 }
 
@@ -748,8 +803,8 @@ function handleViewScheduleLogs(row) {
   proxy.$router.push({ 
     path: '/ai/workflow-schedule-log', 
     query: { 
-      scheduleId: row.scheduleId,
-      workflowId: currentWorkflow.value.workflowId 
+      scheduleId: row.id,
+      workflowId: currentWorkflow.value.id 
     } 
   });
 }

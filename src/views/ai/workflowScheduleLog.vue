@@ -297,7 +297,7 @@
 </style>
 
 <script setup name="WorkflowScheduleLog">
-import { listScheduleLogs, getScheduleLog, delScheduleLog, cleanExpiredScheduleLogs, getScheduleLogStatistics } from "@/api/ai/workflowScheduleLog";
+import { listScheduleLogs, getScheduleLog, delScheduleLog, cleanExpiredLogs, getLogStatistics } from "@/api/ai/workflowScheduleLog";
 
 const { proxy } = getCurrentInstance();
 
@@ -383,7 +383,7 @@ function handleSelectionChange(selection) {
 function handleDetail(row) {
   const logId = row.logId || ids.value[0];
   getScheduleLog(logId).then(response => {
-    detailForm.value = response.data;
+    detailForm.value = response;
     detailOpen.value = true;
   });
 }
@@ -407,7 +407,7 @@ function handleCleanExpired() {
 /** 确认清理过期日志 */
 function confirmCleanExpired() {
   proxy.$modal.confirm(`确认删除${cleanForm.value.days}天前的所有日志吗？此操作不可恢复！`).then(function() {
-    return cleanExpiredScheduleLogs(cleanForm.value.days);
+    return cleanExpiredLogs(cleanForm.value.days);
   }).then(() => {
     cleanOpen.value = false;
     getList();
@@ -428,8 +428,8 @@ function getStatisticsData() {
     statisticsForm.value.endTime = statisticsDateRange.value[1];
   }
   
-  getScheduleLogStatistics(statisticsForm.value).then(response => {
-    statisticsData.value = response.data;
+  getLogStatistics(statisticsForm.value).then(response => {
+    statisticsData.value = response;
   });
 }
 
