@@ -139,7 +139,7 @@
         />
         <div class="input-actions">
           <el-button 
-            v-if="isLoading && currentConnection" 
+            v-if="currentConnection || streamingMessageIndex >= 0" 
             type="danger" 
             @click="handleStop"
             size="small"
@@ -150,7 +150,7 @@
             type="primary" 
             @click="handleSend" 
             :loading="isLoading"
-            :disabled="isLoading"
+            :disabled="isLoading || currentConnection || streamingMessageIndex >= 0"
           >
             发送
           </el-button>
@@ -805,9 +805,13 @@ const handleStop = () => {
   if (currentConnection.value) {
     currentConnection.value.abort()
     currentConnection.value = null
-    isLoading.value = false
-    ElMessage.info('已停止对话')
   }
+  
+  // 重置所有相关状态
+  isLoading.value = false
+  streamingMessageIndex.value = -1
+  
+  ElMessage.info('已停止对话')
 }
 
 // -------- 模型配置管理逻辑 --------
