@@ -101,11 +101,12 @@
           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="200">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)" v-hasPermi="['ai:workflow:query']">详情</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['ai:workflow:edit']">修改</el-button>
           <el-button link type="primary" icon="Setting" @click="handleSteps(scope.row)" v-hasPermi="['ai:workflow:list']">步骤</el-button>
+          <el-button link type="warning" icon="Timer" @click="handleSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:list']">定时</el-button>
           <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['ai:workflow:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -186,11 +187,216 @@
         </el-descriptions-item>
       </el-descriptions>
     </el-dialog>
+
+    <!-- 定时任务管理对话框 -->
+    <el-dialog :title="scheduleTitle" v-model="scheduleOpen" width="1200px" append-to-body @close="closeScheduleDialog">
+      <div class="schedule-management">
+        <!-- 统计信息 -->
+        <el-row :gutter="20" class="mb-4">
+          <el-col :span="6">
+            <el-card class="box-card">
+              <div class="card-header">
+                <span>总数</span>
+              </div>
+              <div class="card-content">
+                <span class="number">{{ scheduleStatistics.total || 0 }}</span>
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card class="box-card">
+              <div class="card-header">
+                <span>已启用</span>
+              </div>
+              <div class="card-content">
+                <span class="number text-success">{{ scheduleStatistics.enabled || 0 }}</span>
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card class="box-card">
+              <div class="card-header">
+                <span>运行中</span>
+              </div>
+              <div class="card-content">
+                <span class="number text-warning">{{ scheduleStatistics.running || 0 }}</span>
+              </div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card class="box-card">
+              <div class="card-header">
+                <span>已暂停</span>
+              </div>
+              <div class="card-content">
+                <span class="number text-danger">{{ scheduleStatistics.paused || 0 }}</span>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+
+        <!-- 操作按钮 -->
+        <el-row class="mb-4">
+          <el-col :span="24">
+            <el-button type="primary" icon="Plus" @click="handleAddSchedule" v-hasPermi="['ai:workflow:schedule:add']">新增定时任务</el-button>
+            <el-button type="success" icon="VideoPlay" @click="handleEnableAllSchedules" v-hasPermi="['ai:workflow:schedule:edit']">启用全部</el-button>
+            <el-button type="warning" icon="VideoPause" @click="handleDisableAllSchedules" v-hasPermi="['ai:workflow:schedule:edit']">禁用全部</el-button>
+            <el-button type="info" icon="Document" @click="handleViewLogs" v-hasPermi="['ai:workflow:schedule:log:list']">查看日志</el-button>
+          </el-col>
+        </el-row>
+
+        <!-- 定时任务列表 -->
+        <el-table v-loading="scheduleLoading" :data="scheduleList" border>
+          <el-table-column label="调度名称" prop="scheduleName" />
+          <el-table-column label="Cron表达式" prop="cronExpression" />
+          <el-table-column label="状态" align="center">
+            <template #default="scope">
+              <el-tag v-if="scope.row.status === 'RUNNING'" type="success">运行中</el-tag>
+              <el-tag v-else-if="scope.row.status === 'PAUSED'" type="warning">已暂停</el-tag>
+              <el-tag v-else-if="scope.row.status === 'STOPPED'" type="danger">已停止</el-tag>
+              <el-tag v-else type="info">{{ scope.row.status }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="启用状态" align="center">
+            <template #default="scope">
+              <el-tag :type="scope.row.enabled === 1 ? 'success' : 'danger'">
+                {{ scope.row.enabled === 1 ? '启用' : '禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="下次执行时间" prop="nextFireTime" width="180">
+            <template #default="scope">
+              {{ parseTime(scope.row.nextFireTime) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="上次执行时间" prop="prevFireTime" width="180">
+            <template #default="scope">
+              {{ parseTime(scope.row.prevFireTime) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" align="center" width="380">
+            <template #default="scope">
+              <el-button link type="primary" icon="Edit" @click="handleUpdateSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">修改</el-button>
+              <el-button v-if="scope.row.status === 'PAUSED'" link type="success" icon="VideoPlay" @click="handleStartSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">启动</el-button>
+              <el-button v-if="scope.row.status === 'RUNNING'" link type="warning" icon="VideoPause" @click="handlePauseSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">暂停</el-button>
+              <el-button v-if="scope.row.status === 'PAUSED'" link type="info" icon="Refresh" @click="handleResumeSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:edit']">恢复</el-button>
+              <el-button link type="primary" icon="CaretRight" @click="handleExecuteSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:execute']">立即执行</el-button>
+              <el-button link type="info" icon="Document" @click="handleViewScheduleLogs(scope.row)" v-hasPermi="['ai:workflow:schedule:log:list']">日志</el-button>
+              <el-button link type="danger" icon="Delete" @click="handleDeleteSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:remove']">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-dialog>
+
+    <!-- 定时任务配置对话框 -->
+    <el-dialog :title="scheduleForm.scheduleId ? '修改定时任务' : '新增定时任务'" v-model="scheduleFormOpen" width="600px" append-to-body>
+      <el-form ref="scheduleRef" :model="scheduleForm" :rules="scheduleRules" label-width="120px">
+        <el-form-item label="调度名称" prop="scheduleName">
+          <el-input v-model="scheduleForm.scheduleName" placeholder="请输入调度名称" />
+        </el-form-item>
+        <el-form-item label="Cron表达式" prop="cronExpression">
+          <el-input v-model="scheduleForm.cronExpression" placeholder="请输入Cron表达式，如：0 0 12 * * ?" />
+          <div class="form-tip">
+            <small>示例：0 0 12 * * ? (每天12点执行)</small>
+          </div>
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="scheduleForm.description" type="textarea" :rows="3" placeholder="请输入描述" />
+        </el-form-item>
+        <el-form-item label="启用状态" prop="enabled">
+          <el-radio-group v-model="scheduleForm.enabled">
+            <el-radio :label="1">启用</el-radio>
+            <el-radio :label="0">禁用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="失火策略">
+          <el-select v-model="scheduleForm.misfirePolicy" placeholder="请选择失火策略">
+            <el-option label="立即执行" :value="1" />
+            <el-option label="执行一次" :value="2" />
+            <el-option label="放弃执行" :value="3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="并发执行">
+          <el-radio-group v-model="scheduleForm.concurrent">
+            <el-radio :label="1">允许</el-radio>
+            <el-radio :label="0">禁止</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="重试次数">
+          <el-input-number v-model="scheduleForm.retryCount" :min="0" :max="10" />
+        </el-form-item>
+        <el-form-item label="执行超时(秒)">
+          <el-input-number v-model="scheduleForm.executionTimeout" :min="60" :max="86400" />
+        </el-form-item>
+        <el-form-item label="优先级">
+          <el-input-number v-model="scheduleForm.priority" :min="1" :max="10" />
+        </el-form-item>
+        <el-form-item label="输入数据">
+          <el-input v-model="scheduleForm.inputData" type="textarea" :rows="4" placeholder="请输入JSON格式的输入数据（可选）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" @click="submitScheduleForm">确 定</el-button>
+          <el-button @click="cancelSchedule">取 消</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
+<style scoped>
+.schedule-management {
+  padding: 10px;
+}
+
+.box-card {
+  text-align: center;
+  border-radius: 8px;
+}
+
+.card-header {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 10px;
+}
+
+.card-content {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.number {
+  display: block;
+}
+
+.text-success {
+  color: #67c23a;
+}
+
+.text-warning {
+  color: #e6a23c;
+}
+
+.text-danger {
+  color: #f56c6c;
+}
+
+.form-tip {
+  margin-top: 5px;
+  color: #999;
+}
+
+.mb-4 {
+  margin-bottom: 20px;
+}
+</style>
+
 <script setup name="AiWorkflow">
 import { listWorkflows, getWorkflow, delWorkflow, addWorkflow, updateWorkflow, toggleWorkflowStatus } from "@/api/ai/workflow";
+import { getWorkflowSchedules, createWorkflowSchedule, updateSchedule, enableAllWorkflowSchedules, disableAllWorkflowSchedules, getWorkflowScheduleStatistics } from "@/api/ai/workflowSchedule";
+import { startSchedule, pauseSchedule, resumeSchedule, executeScheduleOnce, delSchedule } from "@/api/ai/workflowSchedule";
 
 const { proxy } = getCurrentInstance();
 const { sys_normal_disable } = proxy.useDict('sys_normal_disable');
@@ -198,6 +404,8 @@ const { sys_normal_disable } = proxy.useDict('sys_normal_disable');
 const workflowList = ref([]);
 const open = ref(false);
 const detailOpen = ref(false);
+const scheduleOpen = ref(false);
+const scheduleFormOpen = ref(false);
 const loading = ref(true);
 const showSearch = ref(true);
 const ids = ref([]);
@@ -205,10 +413,18 @@ const single = ref(true);
 const multiple = ref(true);
 const total = ref(0);
 const title = ref("");
+const scheduleTitle = ref("");
+
+// 定时任务相关数据
+const scheduleList = ref([]);
+const scheduleLoading = ref(false);
+const currentWorkflow = ref({});
+const scheduleStatistics = ref({});
 
 const data = reactive({
   form: {},
   detailForm: {},
+  scheduleForm: {},
   queryParams: {
     pageNum: 1,
     pageSize: 10,
@@ -232,10 +448,21 @@ const data = reactive({
     status: [
       { required: true, message: "状态不能为空", trigger: "change" }
     ]
+  },
+  scheduleRules: {
+    scheduleName: [
+      { required: true, message: "调度名称不能为空", trigger: "blur" }
+    ],
+    cronExpression: [
+      { required: true, message: "Cron表达式不能为空", trigger: "blur" }
+    ],
+    enabled: [
+      { required: true, message: "启用状态不能为空", trigger: "change" }
+    ]
   }
 });
 
-const { queryParams, form, detailForm, rules } = toRefs(data);
+const { queryParams, form, detailForm, scheduleForm, rules, scheduleRules } = toRefs(data);
 
 /** 查询工作流列表 */
 function getList() {
@@ -357,6 +584,173 @@ function handleSteps(row) {
   proxy.$router.push({
     path: '/ai/workflowStep',
     query: { workflowId: row.id, workflowName: row.name }
+  });
+}
+
+/** 打开定时任务管理对话框 */
+function handleSchedule(row) {
+  currentWorkflow.value = row;
+  scheduleTitle.value = `${row.name} - 定时任务管理`;
+  scheduleOpen.value = true;
+  getScheduleList();
+  getScheduleStats();
+}
+
+/** 获取定时任务列表 */
+function getScheduleList() {
+  scheduleLoading.value = true;
+  getWorkflowSchedules(currentWorkflow.value.workflowId).then(response => {
+    scheduleList.value = response.data;
+    scheduleLoading.value = false;
+  }).catch(() => {
+    scheduleLoading.value = false;
+  });
+}
+
+/** 获取定时任务统计信息 */
+function getScheduleStats() {
+  getWorkflowScheduleStatistics(currentWorkflow.value.workflowId).then(response => {
+    scheduleStatistics.value = response.data;
+  });
+}
+
+/** 新增定时任务 */
+function handleAddSchedule() {
+  reset();
+  scheduleForm.value.workflowId = currentWorkflow.value.workflowId;
+  scheduleForm.value.enabled = 1;
+  scheduleForm.value.misfirePolicy = 1;
+  scheduleForm.value.concurrent = 0;
+  scheduleForm.value.retryCount = 0;
+  scheduleForm.value.executionTimeout = 3600;
+  scheduleForm.value.priority = 5;
+  scheduleFormOpen.value = true;
+}
+
+/** 修改定时任务 */
+function handleUpdateSchedule(row) {
+  reset();
+  scheduleForm.value = { ...row };
+  scheduleFormOpen.value = true;
+}
+
+/** 提交定时任务表单 */
+function submitScheduleForm() {
+  proxy.$refs["scheduleRef"].validate(valid => {
+    if (valid) {
+      if (scheduleForm.value.scheduleId != null) {
+        updateSchedule(scheduleForm.value).then(response => {
+          proxy.$modal.msgSuccess("修改成功");
+          scheduleFormOpen.value = false;
+          getScheduleList();
+          getScheduleStats();
+        });
+      } else {
+        createWorkflowSchedule(scheduleForm.value).then(response => {
+          proxy.$modal.msgSuccess("新增成功");
+          scheduleFormOpen.value = false;
+          getScheduleList();
+          getScheduleStats();
+        });
+      }
+    }
+  });
+}
+
+/** 删除定时任务 */
+function handleDeleteSchedule(row) {
+  proxy.$modal.confirm('是否确认删除定时任务"' + row.scheduleName + '"？').then(function() {
+    return delSchedule(row.scheduleId);
+  }).then(() => {
+    getScheduleList();
+    getScheduleStats();
+    proxy.$modal.msgSuccess("删除成功");
+  }).catch(() => {});
+}
+
+/** 启动定时任务 */
+function handleStartSchedule(row) {
+  startSchedule(row.scheduleId).then(() => {
+    proxy.$modal.msgSuccess("启动成功");
+    getScheduleList();
+    getScheduleStats();
+  });
+}
+
+/** 暂停定时任务 */
+function handlePauseSchedule(row) {
+  pauseSchedule(row.scheduleId).then(() => {
+    proxy.$modal.msgSuccess("暂停成功");
+    getScheduleList();
+    getScheduleStats();
+  });
+}
+
+/** 恢复定时任务 */
+function handleResumeSchedule(row) {
+  resumeSchedule(row.scheduleId).then(() => {
+    proxy.$modal.msgSuccess("恢复成功");
+    getScheduleList();
+    getScheduleStats();
+  });
+}
+
+/** 立即执行定时任务 */
+function handleExecuteSchedule(row) {
+  executeScheduleOnce(row.scheduleId).then(() => {
+    proxy.$modal.msgSuccess("执行成功");
+    getScheduleList();
+  });
+}
+
+/** 启用所有定时任务 */
+function handleEnableAllSchedules() {
+  enableAllWorkflowSchedules(currentWorkflow.value.workflowId).then(() => {
+    proxy.$modal.msgSuccess("启用成功");
+    getScheduleList();
+    getScheduleStats();
+  });
+}
+
+/** 禁用所有定时任务 */
+function handleDisableAllSchedules() {
+  disableAllWorkflowSchedules(currentWorkflow.value.workflowId).then(() => {
+    proxy.$modal.msgSuccess("禁用成功");
+    getScheduleList();
+    getScheduleStats();
+  });
+}
+
+/** 取消定时任务表单 */
+function cancelSchedule() {
+  scheduleFormOpen.value = false;
+  reset();
+}
+
+/** 关闭定时任务管理对话框 */
+function closeScheduleDialog() {
+  scheduleOpen.value = false;
+  scheduleList.value = [];
+  scheduleStatistics.value = {};
+  currentWorkflow.value = {};
+}
+
+/** 查看执行日志 */
+function handleViewLogs() {
+  proxy.$router.push({ 
+    path: '/ai/workflow-schedule-log', 
+    query: { workflowId: currentWorkflow.value.workflowId } 
+  });
+}
+
+/** 查看特定调度任务的日志 */
+function handleViewScheduleLogs(row) {
+  proxy.$router.push({ 
+    path: '/ai/workflow-schedule-log', 
+    query: { 
+      scheduleId: row.scheduleId,
+      workflowId: currentWorkflow.value.workflowId 
+    } 
   });
 }
 
