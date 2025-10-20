@@ -263,14 +263,14 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="下次执行时间" prop="nextFireTime" width="180">
+          <el-table-column label="下次执行时间" prop="nextExecutionTime" width="180">
             <template #default="scope">
-              {{ parseTime(scope.row.nextFireTime) }}
+              {{ parseTime(scope.row.nextExecutionTime) }}
             </template>
           </el-table-column>
-          <el-table-column label="上次执行时间" prop="prevFireTime" width="180">
+          <el-table-column label="上次执行时间" prop="lastExecutionTime" width="180">
             <template #default="scope">
-              {{ parseTime(scope.row.prevFireTime) }}
+              {{ parseTime(scope.row.lastExecutionTime) }}
             </template>
           </el-table-column>
           <el-table-column label="操作" align="center" width="380">
