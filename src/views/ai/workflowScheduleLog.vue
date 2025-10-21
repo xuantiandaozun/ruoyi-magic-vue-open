@@ -19,15 +19,17 @@
       </el-form-item>
       <el-form-item label="执行状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择执行状态" clearable>
-          <el-option label="成功" value="SUCCESS" />
-          <el-option label="失败" value="FAIL" />
-          <el-option label="运行中" value="RUNNING" />
+          <el-option label="已完成" value="completed" />
+          <el-option label="失败" value="failed" />
+          <el-option label="运行中" value="running" />
+          <el-option label="超时" value="timeout" />
+          <el-option label="已取消" value="cancelled" />
         </el-select>
       </el-form-item>
       <el-form-item label="触发类型" prop="triggerType">
         <el-select v-model="queryParams.triggerType" placeholder="请选择触发类型" clearable>
-          <el-option label="定时触发" value="SCHEDULED" />
-          <el-option label="手动触发" value="MANUAL" />
+          <el-option label="定时触发" value="scheduled" />
+          <el-option label="手动触发" value="manual" />
         </el-select>
       </el-form-item>
       <el-form-item label="执行时间">
@@ -79,32 +81,34 @@
 
     <el-table v-loading="loading" :data="logList" @selection-change="handleSelectionChange" border>
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="日志ID" prop="logId" width="80" />
+      <el-table-column label="日志ID" prop="id" width="80" />
       <el-table-column label="调度名称" prop="scheduleName" />
       <el-table-column label="工作流名称" prop="workflowName" />
       <el-table-column label="执行状态" align="center" width="100">
         <template #default="scope">
-          <el-tag v-if="scope.row.status === 'SUCCESS'" type="success">成功</el-tag>
-          <el-tag v-else-if="scope.row.status === 'FAIL'" type="danger">失败</el-tag>
-          <el-tag v-else-if="scope.row.status === 'RUNNING'" type="warning">运行中</el-tag>
+          <el-tag v-if="scope.row.status === 'completed'" type="success">已完成</el-tag>
+          <el-tag v-else-if="scope.row.status === 'failed'" type="danger">失败</el-tag>
+          <el-tag v-else-if="scope.row.status === 'running'" type="warning">运行中</el-tag>
+          <el-tag v-else-if="scope.row.status === 'timeout'" type="info">超时</el-tag>
+          <el-tag v-else-if="scope.row.status === 'cancelled'" type="info">已取消</el-tag>
           <el-tag v-else type="info">{{ scope.row.status }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="触发类型" align="center" width="100">
         <template #default="scope">
-          <el-tag v-if="scope.row.triggerType === 'SCHEDULED'" type="primary">定时触发</el-tag>
-          <el-tag v-else-if="scope.row.triggerType === 'MANUAL'" type="warning">手动触发</el-tag>
+          <el-tag v-if="scope.row.triggerType === 'scheduled'" type="success">定时触发</el-tag>
+          <el-tag v-else-if="scope.row.triggerType === 'manual'" type="warning">手动触发</el-tag>
           <el-tag v-else type="info">{{ scope.row.triggerType }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="开始时间" prop="startTime" width="180">
+      <el-table-column label="开始时间" prop="actualStartTime" width="180">
         <template #default="scope">
-          {{ parseTime(scope.row.startTime) }}
+          {{ parseTime(scope.row.actualStartTime) }}
         </template>
       </el-table-column>
-      <el-table-column label="结束时间" prop="endTime" width="180">
+      <el-table-column label="结束时间" prop="actualEndTime" width="180">
         <template #default="scope">
-          {{ parseTime(scope.row.endTime) }}
+          {{ parseTime(scope.row.actualEndTime) }}
         </template>
       </el-table-column>
       <el-table-column label="执行时长" align="center" width="100">
@@ -131,24 +135,26 @@
     <!-- 日志详情对话框 -->
     <el-dialog title="执行日志详情" v-model="detailOpen" width="800px" append-to-body>
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="日志ID">{{ detailForm.logId }}</el-descriptions-item>
+        <el-descriptions-item label="日志ID">{{ detailForm.id }}</el-descriptions-item>
         <el-descriptions-item label="调度ID">{{ detailForm.scheduleId }}</el-descriptions-item>
         <el-descriptions-item label="调度名称">{{ detailForm.scheduleName }}</el-descriptions-item>
         <el-descriptions-item label="工作流ID">{{ detailForm.workflowId }}</el-descriptions-item>
         <el-descriptions-item label="工作流名称">{{ detailForm.workflowName }}</el-descriptions-item>
         <el-descriptions-item label="执行状态">
-          <el-tag v-if="detailForm.status === 'SUCCESS'" type="success">成功</el-tag>
-          <el-tag v-else-if="detailForm.status === 'FAIL'" type="danger">失败</el-tag>
-          <el-tag v-else-if="detailForm.status === 'RUNNING'" type="warning">运行中</el-tag>
+          <el-tag v-if="detailForm.status === 'completed'" type="success">已完成</el-tag>
+          <el-tag v-else-if="detailForm.status === 'failed'" type="danger">失败</el-tag>
+          <el-tag v-else-if="detailForm.status === 'running'" type="warning">运行中</el-tag>
+          <el-tag v-else-if="detailForm.status === 'timeout'" type="info">超时</el-tag>
+          <el-tag v-else-if="detailForm.status === 'cancelled'" type="info">已取消</el-tag>
           <el-tag v-else type="info">{{ detailForm.status }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="触发类型">
-          <el-tag v-if="detailForm.triggerType === 'SCHEDULED'" type="primary">定时触发</el-tag>
-          <el-tag v-else-if="detailForm.triggerType === 'MANUAL'" type="warning">手动触发</el-tag>
+          <el-tag v-if="detailForm.triggerType === 'scheduled'" type="success">定时触发</el-tag>
+          <el-tag v-else-if="detailForm.triggerType === 'manual'" type="warning">手动触发</el-tag>
           <el-tag v-else type="info">{{ detailForm.triggerType }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="开始时间">{{ parseTime(detailForm.startTime) }}</el-descriptions-item>
-        <el-descriptions-item label="结束时间">{{ parseTime(detailForm.endTime) }}</el-descriptions-item>
+        <el-descriptions-item label="开始时间">{{ parseTime(detailForm.actualStartTime) }}</el-descriptions-item>
+        <el-descriptions-item label="结束时间">{{ parseTime(detailForm.actualEndTime) }}</el-descriptions-item>
         <el-descriptions-item label="执行时长">{{ detailForm.executionDuration ? detailForm.executionDuration + 'ms' : '-' }}</el-descriptions-item>
         <el-descriptions-item label="输入数据" :span="2" v-if="detailForm.inputData">
           <pre style="white-space: pre-wrap; word-break: break-all;">{{ detailForm.inputData }}</pre>
@@ -182,14 +188,14 @@
           <el-input v-model="statisticsForm.workflowId" placeholder="可选，指定工作流ID" />
         </el-form-item>
       </el-form>
-      <el-row :gutter="20" v-if="statisticsData.total > 0">
+      <el-row :gutter="20" v-if="statisticsData.totalCount > 0">
         <el-col :span="12">
           <el-card class="box-card">
             <div class="card-header">
               <span>总执行次数</span>
             </div>
             <div class="card-content">
-              <span class="number">{{ statisticsData.total || 0 }}</span>
+              <span class="number">{{ statisticsData.totalCount || 0 }}</span>
             </div>
           </el-card>
         </el-col>
@@ -199,7 +205,7 @@
               <span>成功次数</span>
             </div>
             <div class="card-content">
-              <span class="number text-success">{{ statisticsData.success || 0 }}</span>
+              <span class="number text-success">{{ statisticsData.successCount || 0 }}</span>
             </div>
           </el-card>
         </el-col>
@@ -209,7 +215,7 @@
               <span>失败次数</span>
             </div>
             <div class="card-content">
-              <span class="number text-danger">{{ statisticsData.fail || 0 }}</span>
+              <span class="number text-danger">{{ statisticsData.failCount || 0 }}</span>
             </div>
           </el-card>
         </el-col>
@@ -374,14 +380,14 @@ function resetQuery() {
 
 /** 多选框选中数据 */
 function handleSelectionChange(selection) {
-  ids.value = selection.map(item => item.logId);
+  ids.value = selection.map(item => item.id);
   single.value = selection.length != 1;
   multiple.value = !selection.length;
 }
 
 /** 详情按钮操作 */
 function handleDetail(row) {
-  const logId = row.logId || ids.value[0];
+  const logId = row.id || ids.value[0];
   getScheduleLog(logId).then(response => {
     detailForm.value = response;
     detailOpen.value = true;
@@ -390,7 +396,7 @@ function handleDetail(row) {
 
 /** 删除按钮操作 */
 function handleDelete(row) {
-  const logIds = row.logId ? [row.logId] : ids.value;
+  const logIds = row.id ? [row.id] : ids.value;
   proxy.$modal.confirm('是否确认删除选中的执行日志？').then(function() {
     return delScheduleLog(logIds);
   }).then(() => {

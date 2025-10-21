@@ -112,7 +112,7 @@
       <div v-if="isLoading" class="message-item ai-message">
         <div class="message-wrapper">
           <div class="message-avatar">
-            <el-avatar background-color="#10a37f">
+            <el-avatar background-color="#3b82f6">
               <el-icon><ChatDotRound /></el-icon>
             </el-avatar>
           </div>
@@ -132,17 +132,18 @@
         <el-input
           v-model="inputMessage"
           type="textarea"
-          :rows="3"
-          placeholder="请输入您的问题..."
+          :rows="1"
+          placeholder="给AI助手发送消息"
           @keydown.enter.prevent="handleSend"
           :disabled="isLoading"
+          resize="none"
         />
         <div class="input-actions">
           <el-button 
             v-if="currentConnection || streamingMessageIndex >= 0" 
             type="danger" 
             @click="handleStop"
-            size="small"
+            size="default"
           >
             停止
           </el-button>
@@ -150,7 +151,9 @@
             type="primary" 
             @click="handleSend" 
             :loading="isLoading"
-            :disabled="isLoading || currentConnection || streamingMessageIndex >= 0"
+            :disabled="isLoading || currentConnection || streamingMessageIndex >= 0 || !inputMessage.trim()"
+            size="default"
+            :class="{'send-button-disabled': !inputMessage.trim()}"
           >
             发送
           </el-button>
@@ -1029,32 +1032,31 @@ const scrollToBottom = () => {
 .ai-chat-container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
-  background: #ffffff;
+  height: 100vh;
+  background: #f7f7f8;
+  font-family: 'Söhne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
+  padding: 12px 16px;
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
 }
 
 .chat-header h2 {
   margin: 0;
   color: #111827;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
 }
 
@@ -1079,10 +1081,15 @@ const scrollToBottom = () => {
 .message-list {
   display: flex;
   flex-direction: column;
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 16px;
 }
 
 .message-item {
   width: 100%;
+  padding: 24px 0;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -1091,51 +1098,57 @@ const scrollToBottom = () => {
 }
 
 .ai-message {
-  background: #f7f7f8;
+  background: #ffffff;
 }
 
 .message-wrapper {
   display: flex;
-  gap: 24px;
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 24px;
+  gap: 16px;
+  width: 100%;
 }
 
 .message-avatar {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
+  margin-top: 4px;
 }
 
 .message-avatar :deep(.el-avatar) {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
 }
 
 .message-content {
   flex: 1;
   min-width: 0;
+  line-height: 1.75;
 }
 
 .message-text {
-  line-height: 1.75;
+  font-size: 16px;
+  color: #374151;
   word-wrap: break-word;
-  font-size: 15px;
-  color: #111827;
+  line-height: 1.75;
 }
 
 .typing-indicator {
   display: flex;
-  gap: 6px;
-  padding: 8px 0;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  max-width: 80px;
 }
 
 .typing-indicator span {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #10a37f;
+  background: #3b82f6;
   animation: typing 1.4s infinite ease-in-out;
 }
 
@@ -1148,67 +1161,113 @@ const scrollToBottom = () => {
 }
 
 @keyframes typing {
-  0%, 80%, 100% { 
-    transform: scale(0);
+  0%, 80%, 100% {
+    transform: scale(0.8);
     opacity: 0.5;
   }
-  40% { 
+  40% {
     transform: scale(1);
     opacity: 1;
   }
 }
 
 .chat-input {
-  padding: 24px;
+  padding: 20px 16px;
   background: #ffffff;
   border-top: 1px solid #e5e7eb;
 }
 
 .chat-input-inner {
-  max-width: 860px;
+  max-width: 48rem;
   margin: 0 auto;
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
-  padding: 12px;
+  position: relative;
   background: #ffffff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #d1d5db;
+  overflow: hidden;
 }
 
 .chat-input-inner:focus-within {
-  border-color: #10a37f;
-  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.chat-input :deep(.el-textarea) {
+  display: flex;
+  align-items: flex-end;
 }
 
 .chat-input :deep(.el-textarea__inner) {
   border: none;
   box-shadow: none;
   background-color: transparent;
-  padding: 8px;
+  padding: 16px 60px 16px 16px;
   resize: none;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #374151;
+  min-height: 52px;
+  max-height: 200px;
 }
 
 .chat-input :deep(.el-textarea__inner):focus {
   box-shadow: none;
 }
 
+.chat-input :deep(.el-textarea__inner)::placeholder {
+  color: #9ca3af;
+}
+
 .input-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
   display: flex;
-  justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  margin-top: 8px;
 }
 
 .input-actions .el-button {
-  border-radius: 8px;
-  padding: 10px 20px;
-  background: #10a37f;
-  border-color: #10a37f;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 8px 16px;
+  height: auto;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.input-actions .el-button:hover {
-  background: #0d8c6c;
-  border-color: #0d8c6c;
+.input-actions .el-button--danger {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.input-actions .el-button--danger:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+.input-actions .el-button--primary {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.input-actions .el-button--primary:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.input-actions .el-button--primary.send-button-disabled {
+  background-color: #9ca3af;
+  border-color: #9ca3af;
+}
+
+.input-actions .el-button--primary.send-button-disabled:hover {
+  background-color: #6b7280;
+  border-color: #6b7280;
 }
 
 /* 滚动条样式 */
@@ -1231,7 +1290,7 @@ const scrollToBottom = () => {
 
 /* Markdown 样式 */
 .message-text :deep(p) {
-  margin: 0 0 12px 0;
+  margin: 0 0 16px 0;
 }
 
 .message-text :deep(p:last-child) {
@@ -1239,7 +1298,7 @@ const scrollToBottom = () => {
 }
 
 .message-text :deep(pre) {
-  background: #000000;
+  background: #1e1e1e;
   color: #ffffff;
   padding: 16px;
   border-radius: 8px;
@@ -1261,8 +1320,8 @@ const scrollToBottom = () => {
 }
 
 .message-text :deep(p code) {
-  background: rgba(0, 0, 0, 0.05);
-  color: #111827;
+  background: rgba(175, 184, 193, 0.2);
+  color: #374151;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.9em;
@@ -1270,12 +1329,12 @@ const scrollToBottom = () => {
 
 .message-text :deep(ul),
 .message-text :deep(ol) {
-  margin: 12px 0;
+  margin: 16px 0;
   padding-left: 24px;
 }
 
 .message-text :deep(li) {
-  margin: 6px 0;
+  margin: 8px 0;
 }
 
 .message-text :deep(blockquote) {
@@ -1289,7 +1348,7 @@ const scrollToBottom = () => {
 .message-text :deep(h2),
 .message-text :deep(h3),
 .message-text :deep(h4) {
-  margin: 20px 0 12px 0;
+  margin: 24px 0 16px 0;
   font-weight: 600;
   color: #111827;
 }
@@ -1317,7 +1376,7 @@ const scrollToBottom = () => {
 }
 
 .message-text :deep(a) {
-  color: #10a37f;
+  color: #3b82f6;
   text-decoration: none;
 }
 
@@ -1362,12 +1421,7 @@ const scrollToBottom = () => {
 
 /* 流式输入光标样式 */
 .typing-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1.2em;
-  background-color: #10a37f;
-  margin-left: 2px;
-  animation: blink 1s infinite;
+  display: none;
 }
 
 @keyframes blink {
@@ -1448,11 +1502,15 @@ const scrollToBottom = () => {
   color: #6b7280 !important;
   padding: 4px 8px !important;
   font-size: 12px !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
 }
 
 .copy-message-btn:hover {
-  color: #10a37f !important;
-  background: rgba(16, 163, 127, 0.1) !important;
+  color: #1e40af !important;
+  background: rgba(30, 64, 175, 0.1) !important;
+  border-color: rgba(30, 64, 175, 0.2) !important;
 }
 
 /* 工具调用样式 */
@@ -1461,13 +1519,15 @@ const scrollToBottom = () => {
 }
 
 .tool-call-item {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .tool-call-collapse {
   border: 1px solid #e4e7ed;
   border-radius: 8px;
   overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .tool-call-collapse :deep(.el-collapse-item__header) {
@@ -1476,6 +1536,7 @@ const scrollToBottom = () => {
   border: none;
   cursor: pointer;
   transition: background-color 0.2s ease;
+  font-weight: 500;
 }
 
 .tool-call-collapse :deep(.el-collapse-item__header):hover {
@@ -1495,29 +1556,31 @@ const scrollToBottom = () => {
 }
 
 .tool-icon {
-  color: #409eff;
+  color: #3b82f6;
   font-size: 16px;
 }
 
 .tool-name {
   font-weight: 500;
-  color: #303133;
+  color: #374151;
   flex: 1;
 }
 
 .tool-status {
   margin-left: auto;
+  font-weight: 500;
 }
 
 .tool-call-content {
   padding: 16px;
   background-color: #fafafa;
+  border-top: 1px solid #e4e7ed;
 }
 
 .tool-section-title {
   font-size: 14px;
   font-weight: 500;
-  color: #606266;
+  color: #6b7280;
   margin-bottom: 8px;
 }
 
@@ -1532,12 +1595,12 @@ const scrollToBottom = () => {
 .tool-data {
   background-color: #f5f5f5;
   border: 1px solid #e4e7ed;
-  border-radius: 4px;
+  border-radius: 6px;
   padding: 12px;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 13px;
   line-height: 1.4;
-  color: #303133;
+  color: #374151;
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 200px;

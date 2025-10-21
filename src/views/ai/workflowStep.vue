@@ -315,6 +315,9 @@
                 <el-option label="博客保存" value="blog_save" />
                 <el-option label="英文博客保存" value="blog_en_save" />
                 <el-option label="自媒体文章保存" value="social_media_article_save" />
+                <el-option label="OSS文件读取" value="oss_file_read" />
+                <el-option label="GitHub仓库目录" value="github_repo_tree" />
+                <el-option label="GitHub文件内容" value="github_file_content" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -658,7 +661,10 @@ function getToolTypeName(toolType) {
     'database_query': '数据库查询',
     'blog_save': '博客保存',
     'blog_en_save': '英文博客保存',
-    'social_media_article_save': '社交媒体文章保存'
+    'social_media_article_save': '社交媒体文章保存',
+    'oss_file_read': 'OSS文件读取',
+    'github_repo_tree': 'GitHub仓库目录',
+    'github_file_content': 'GitHub文件内容'
   };
   return typeNames[toolType] || toolType;
 }
@@ -670,7 +676,10 @@ function getToolDescription(toolType) {
     'database_query': '💾 数据库查询工具：AI会根据用户的查询需求，自动生成并执行合适的SQL语句，无需手动编写查询语句。',
     'blog_save': '📝 博客保存工具：AI会智能识别博客内容，自动处理标题、内容、标签等信息，保存到博客系统中。',
     'blog_en_save': '📝 英文博客保存工具：AI会智能识别英文博客内容，自动处理标题、内容、标签等信息，保存到英文博客系统中。',
-    'social_media_article_save': '📱 社交媒体文章保存工具：AI会智能识别社交媒体文章内容，自动处理标题、内容、平台信息等，保存到社交媒体管理系统中。'
+    'social_media_article_save': '📱 社交媒体文章保存工具：AI会智能识别社交媒体文章内容，自动处理标题、内容、平台信息等，保存到社交媒体管理系统中。',
+    'oss_file_read': '📄 OSS文件读取工具：AI会通过OSS URL获取远程文件内容，支持README文档等文件的读取，无需手动配置URL和参数。',
+    'github_repo_tree': '🌳 GitHub仓库目录工具：AI会通过GitHub API获取指定仓库的文件目录结构，支持递归查看和分支选择，无需手动配置仓库信息。',
+    'github_file_content': '📄 GitHub文件内容工具：AI会通过GitHub API获取指定仓库中特定文件的完整内容，支持代码文件、配置文件等，无需手动配置仓库和文件路径。'
   };
   return descriptions[toolType] || '🤖 智能工具：该工具将由AI根据上下文自动调用，所有参数都由AI智能决定，无需人工配置。';
 }
