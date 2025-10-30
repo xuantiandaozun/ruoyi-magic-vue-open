@@ -792,6 +792,9 @@ function closeScheduleDialog() {
 
 /** 查看执行日志 */
 function handleViewLogs() {
+  // 先关闭定时任务管理弹窗
+  closeScheduleDialog();
+  // 然后跳转到日志页面
   proxy.$router.push({ 
     path: '/ai/workflow-schedule-log', 
     query: { workflowId: currentWorkflow.value.id } 
@@ -800,6 +803,9 @@ function handleViewLogs() {
 
 /** 查看特定调度任务的日志 */
 function handleViewScheduleLogs(row) {
+  // 先关闭定时任务管理弹窗
+  closeScheduleDialog();
+  // 然后跳转到日志页面
   proxy.$router.push({ 
     path: '/ai/workflow-schedule-log', 
     query: { 

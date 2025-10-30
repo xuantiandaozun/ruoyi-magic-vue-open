@@ -1,5 +1,65 @@
 <template>
   <div class="ai-chat-container">
+    <!-- 会话管理侧边栏 -->
+    <div class="chat-sidebar" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+      <div class="sidebar-header">
+        <div class="sidebar-title">
+          <el-icon><ChatDotRound /></el-icon>
+          <span v-if="!sidebarCollapsed">聊天会话</span>
+        </div>
+        <div class="sidebar-actions">
+          <el-button 
+            v-if="!sidebarCollapsed"
+            type="primary" 
+            size="small" 
+            @click="createNewSession"
+            :icon="Plus"
+          >
+            新建会话
+          </el-button>
+          <el-button 
+            type="text" 
+            size="small" 
+            @click="toggleSidebar"
+            :icon="sidebarCollapsed ? ArrowRight : ArrowLeft"
+          />
+        </div>
+      </div>
+      
+      <div v-if="!sidebarCollapsed" class="session-list">
+        <div 
+          v-for="session in chatSessions" 
+          :key="session.id"
+          :class="['session-item', { 'active': currentSessionId === session.id }]"
+          @click="switchToSession(session.id)"
+        >
+          <div class="session-content">
+            <div class="session-title">{{ session.sessionName || '新对话' }}</div>
+            <div class="session-time">{{ formatTime(session.updateTime) }}</div>
+          </div>
+          <div class="session-actions">
+            <el-dropdown @command="handleSessionAction">
+              <el-button type="text" size="small">
+                <el-icon><MoreFilled /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item :command="{ action: 'rename', sessionId: session.id }">重命名</el-dropdown-item>
+                  <el-dropdown-item :command="{ action: 'delete', sessionId: session.id }" divided>删除</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </div>
+        
+        <div v-if="chatSessions.length === 0" class="empty-sessions">
+          <el-empty description="暂无会话" :image-size="80" />
+        </div>
+      </div>
+    </div>
+    
+    <!-- 主聊天区域 -->
+    <div class="chat-main" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <div class="chat-header">
       <div class="header-left">
         <h2>AI 智能助手</h2>
@@ -287,18 +347,35 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+
+    <!-- 重命名会话对话框 -->
+    <el-dialog v-model="renameDialogVisible" title="重命名会话" width="400px">
+      <el-form :model="renameForm" :rules="renameRules" ref="renameFormRef" label-width="80px">
+        <el-form-item label="会话名称" prop="title">
+          <el-input v-model="renameForm.title" placeholder="请输入会话名称" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="renameDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitRename" :loading="renameLoading">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
+    </div> <!-- 关闭主聊天区域 -->
+  </div> <!-- 关闭容器 -->
 </template>
 
 <script setup>
-import { clearChatHistory, createChatStream, getChatHistory, getAvailableChatModels } from '@/api/ai/chat'
+import { createChatStream, getAvailableChatModels, getChatHistory } from '@/api/ai/chat'
+import { clearAllChatHistory, createChatSession, deleteChatSession, getChatSession, getChatSessions, getSessionMessages, updateChatSession, saveAiMessage } from '@/api/ai/chatSession'
 import { addModelConfig, delModelConfig, getModelConfig, listModelConfigs, updateModelConfig } from '@/api/ai/modelConfig'
-import { ChatDotRound, UserFilled, Plus, DocumentCopy, Tools } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, ChatDotRound, DocumentCopy, MoreFilled, Plus, Tools, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { marked } from 'marked'
 import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/vs2015.css'
+import { marked } from 'marked'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 // 配置marked和highlight.js
 marked.setOptions({
@@ -419,6 +496,23 @@ const currentConnection = ref(null)
 const streamingMessageIndex = ref(-1) // 正在流式输入的消息索引
 const toolCalls = ref([]) // 当前对话中的工具调用记录
 
+// 会话管理相关
+const chatSessions = ref([])
+const currentSessionId = ref(null)
+const sidebarCollapsed = ref(false)
+
+// 重命名会话相关
+const renameDialogVisible = ref(false)
+const renameLoading = ref(false)
+const renameFormRef = ref()
+const renameForm = ref({
+  sessionId: null,
+  title: ''
+})
+const renameRules = {
+  title: [{ required: true, message: '请输入会话名称', trigger: 'blur' }]
+}
+
 // 聊天模型相关
 const chatModels = ref([])
 const selectedModelId = ref(null)
@@ -473,10 +567,11 @@ const quickAddRules = {
   endpoint: [{ required: true, message: '请输入API端点', trigger: 'blur' }],
 }
 
-// 组件挂载时加载历史记录和模型列表
+// 组件挂载时加载会话列表和模型列表
 onMounted(() => {
-  loadChatHistory()
+  loadChatSessions()
   loadChatModels()
+  fetchModelConfigs()
 })
 
 // 加载聊天历史记录
@@ -485,8 +580,8 @@ const loadChatHistory = async () => {
     const response = await getChatHistory()
     if (response.code === 200 && response.data) {
       messages.value = response.data.map(item => ({
-        role: item.role,
-        content: item.content,
+        role: item.messageRole,
+        content: item.messageContent,
         timestamp: new Date(item.createTime)
       }))
       scrollToBottom()
@@ -519,6 +614,168 @@ const handleModelChange = (modelId) => {
   const selectedModel = chatModels.value.find(model => model.id === modelId)
   if (selectedModel) {
     ElMessage.success(`已切换到模型: ${selectedModel.provider}/${selectedModel.model}`)
+  }
+}
+
+// 加载聊天会话列表
+const loadChatSessions = async () => {
+  try {
+    const response = await getChatSessions({ pageNum: 1, pageSize: 50 })
+    if (response.code === 200 && response.rows) {
+      chatSessions.value = response.rows
+      // 如果没有当前会话且有会话列表，选择第一个会话
+      if (!currentSessionId.value && chatSessions.value.length > 0) {
+        await switchToSession(chatSessions.value[0].id)
+      } else if (chatSessions.value.length === 0) {
+        // 如果没有会话，创建一个新会话
+        await createNewSession()
+      }
+    }
+  } catch (error) {
+    console.error('加载会话列表失败:', error)
+  }
+}
+
+// 切换到指定会话
+const switchToSession = async (sessionId) => {
+  try {
+    currentSessionId.value = sessionId
+    
+    // 获取会话详情，包括模型配置ID
+    const sessionResponse = await getChatSession(sessionId)
+    if (sessionResponse.code === 200 && sessionResponse.data) {
+      const sessionData = sessionResponse.data
+      
+      // 如果会话有关联的模型配置，自动切换到该模型配置
+      if (sessionData.modelConfigId && sessionData.modelConfigId !== selectedModelId.value) {
+        try {
+          // 从聊天模型列表中找到对应的配置
+          const targetModel = chatModels.value.find(model => model.id === sessionData.modelConfigId)
+          if (targetModel) {
+            handleModelChange(targetModel.id)
+            console.log(`已自动切换到模型配置: ${targetModel.provider}/${targetModel.model}`)
+          }
+        } catch (error) {
+          console.warn('自动切换模型配置失败:', error)
+          // 不阻断会话切换流程
+        }
+      }
+    }
+    
+    // 加载会话消息
+    const response = await getSessionMessages(sessionId, { pageNum: 1, pageSize: 100 })
+    if (response.code === 200 && response.rows) {
+      messages.value = response.rows.map(item => ({
+        role: item.messageRole,
+        content: item.messageContent,
+        timestamp: new Date(item.createTime),
+        toolCalls: item.toolCalls ? JSON.parse(item.toolCalls) : []
+      }))
+      await nextTick()
+      scrollToBottom()
+    }
+  } catch (error) {
+    console.error('切换会话失败:', error)
+    ElMessage.error('切换会话失败')
+  }
+}
+
+// 创建新会话
+const createNewSession = async () => {
+  try {
+    // 获取当前选中的模型配置
+    const currentModel = chatModels.value.find(model => model.id === selectedModelId.value)
+    
+    const response = await createChatSession({
+      sessionName: '新对话',
+      sessionType: 'chat',
+      status: '0',
+      modelConfigId: currentModel?.id || null
+    })
+    if (response.code === 200 && response.data) {
+      // 重新加载会话列表
+      await loadChatSessions()
+      // 切换到新创建的会话
+      await switchToSession(response.data.id)
+      ElMessage.success('创建新会话成功')
+    }
+  } catch (error) {
+    console.error('创建会话失败:', error)
+    ElMessage.error('创建会话失败')
+  }
+}
+
+// 切换侧边栏显示状态
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+// 处理会话操作
+const handleSessionAction = async (command) => {
+  const { action, sessionId } = command
+  
+  if (action === 'rename') {
+    // 打开重命名对话框
+    const session = chatSessions.value.find(s => s.id === sessionId)
+    if (session) {
+      renameForm.value.sessionId = sessionId
+      renameForm.value.title = session.sessionName || '新对话'
+      renameDialogVisible.value = true
+    }
+  } else if (action === 'delete') {
+    // 删除会话
+    try {
+      await ElMessageBox.confirm(
+        '确定要删除这个会话吗？此操作不可恢复。',
+        '确认删除',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+      )
+      
+      const response = await deleteChatSession(sessionId)
+      if (response.code === 200) {
+        ElMessage.success('删除会话成功')
+        // 如果删除的是当前会话，清空消息列表
+        if (currentSessionId.value === sessionId) {
+          messages.value = []
+          currentSessionId.value = null
+        }
+        // 重新加载会话列表
+        await loadChatSessions()
+      }
+    } catch (error) {
+      if (error !== 'cancel') {
+        console.error('删除会话失败:', error)
+        ElMessage.error('删除会话失败')
+      }
+    }
+  }
+}
+
+// 提交重命名
+const submitRename = async () => {
+  try {
+    await renameFormRef.value.validate()
+    renameLoading.value = true
+    
+    const response = await updateChatSession(renameForm.value.sessionId, {
+      sessionName: renameForm.value.title
+    })
+    
+    if (response.code === 200) {
+      ElMessage.success('重命名成功')
+      renameDialogVisible.value = false
+      // 重新加载会话列表
+      await loadChatSessions()
+    }
+  } catch (error) {
+    console.error('重命名失败:', error)
+    ElMessage.error('重命名失败')
+  } finally {
+    renameLoading.value = false
   }
 }
 
@@ -574,11 +831,24 @@ const handleSend = async () => {
       message: currentInput,
       systemPrompt: '',
       modelConfigId: selectedModelId.value,
-      chatHistory: chatHistory
+      chatHistory: chatHistory,
+      sessionId: currentSessionId.value
     }, {
       onMessage: (chunk) => {
         // 实时更新AI消息内容
         console.log('Vue组件收到消息块:', chunk); // 调试信息
+        
+        // 尝试解析JSON，如果是会话信息等控制数据则跳过
+        try {
+          const parsed = JSON.parse(chunk)
+          if (parsed.type === 'session' || parsed.type === 'error') {
+            console.log('收到控制信息，跳过:', parsed)
+            return
+          }
+        } catch (e) {
+          // 不是JSON，继续处理为普通文本
+        }
+        
         console.log('当前AI消息索引:', aiMessageIndex); // 调试信息
         console.log('更新前的内容:', messages.value[aiMessageIndex].content); // 调试信息
         
@@ -650,9 +920,26 @@ const handleSend = async () => {
         isLoading.value = false
         currentConnection.value = null
       },
-      onComplete: () => {
+      onComplete: async () => {
         console.log('SSE连接完成')
         console.log('完成时的AI消息内容:', messages.value[aiMessageIndex]?.content); // 调试信息
+        
+        // 保存AI消息到数据库
+        try {
+          const aiMessage = messages.value[aiMessageIndex]
+          if (aiMessage && aiMessage.content && currentSessionId.value) {
+            await saveAiMessage({
+              sessionId: currentSessionId.value,
+              content: aiMessage.content,
+              modelConfigId: selectedModelId.value
+            })
+            console.log('AI消息已保存到数据库')
+          }
+        } catch (error) {
+          console.error('保存AI消息失败:', error)
+          // 不显示错误提示，避免影响用户体验
+        }
+        
         // 清除流式输入状态
         streamingMessageIndex.value = -1
         // 确保最后滚动到底部
@@ -699,8 +986,12 @@ const clearHistory = async () => {
       }
     )
     
-    await clearChatHistory()
+    await clearAllChatHistory()
     messages.value = []
+    chatSessions.value = []
+    currentSessionId.value = null
+    // 创建一个新会话
+    await createNewSession()
     ElMessage.success('对话记录已清空')
   } catch (error) {
     if (error !== 'cancel') {
@@ -1031,10 +1322,24 @@ const scrollToBottom = () => {
 <style scoped>
 .ai-chat-container {
   display: flex;
-  flex-direction: column;
-  height: 100vh;
+  flex-direction: row; /* 改为水平布局 */
+  height: calc(100vh - 84px); /* 减去标签栏等上方元素的高度 */
   background: #f7f7f8;
   font-family: 'Söhne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* 聊天主区域样式 */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  transition: all 0.3s ease;
+  min-width: 0; /* 防止flex子项溢出 */
+}
+
+.chat-main.sidebar-collapsed {
+  margin-left: 0;
 }
 
 .chat-header {
@@ -1045,6 +1350,7 @@ const scrollToBottom = () => {
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0; /* 防止头部被压缩 */
 }
 
 .header-left {
@@ -1076,15 +1382,16 @@ const scrollToBottom = () => {
   flex: 1;
   overflow-y: auto;
   background: #ffffff;
+  min-height: 0; /* 确保flex子项能正确收缩 */
 }
 
 .message-list {
   display: flex;
   flex-direction: column;
-  max-width: 48rem;
-  margin: 0 auto;
+  max-width: none; /* 移除最大宽度限制，让消息占满可用空间 */
+  margin: 0;
   width: 100%;
-  padding: 0 16px;
+  padding: 0 24px; /* 增加左右内边距 */
 }
 
 .message-item {
@@ -1172,14 +1479,15 @@ const scrollToBottom = () => {
 }
 
 .chat-input {
-  padding: 20px 16px;
+  padding: 20px 24px; /* 与消息区域保持一致的内边距 */
   background: #ffffff;
   border-top: 1px solid #e5e7eb;
+  flex-shrink: 0; /* 防止输入区域被压缩 */
 }
 
 .chat-input-inner {
-  max-width: 48rem;
-  margin: 0 auto;
+  max-width: none; /* 移除最大宽度限制 */
+  margin: 0;
   position: relative;
   background: #ffffff;
   border-radius: 12px;
@@ -1606,6 +1914,180 @@ const scrollToBottom = () => {
   max-height: 200px;
   overflow-y: auto;
   margin: 0;
+}
+
+/* 会话管理侧边栏样式 */
+.chat-sidebar {
+  width: 280px;
+  background-color: #f8f9fa;
+  border-right: 1px solid #e4e7ed;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+}
+
+.chat-sidebar.sidebar-collapsed {
+  width: 0;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid #e4e7ed;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.empty-sessions {
+  padding: 20px;
+  text-align: center;
+}
+
+.session-item {
+  padding: 12px 16px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-item:hover {
+  background-color: #e5e7eb;
+}
+
+.session-item.active {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #2563eb;
+}
+
+.session-item.active:hover {
+  background-color: #2563eb;
+}
+
+.session-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-time {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.session-item .session-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0;
+}
+
+.session-item:hover .session-actions {
+  opacity: 1;
+}
+
+.session-item.active .session-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.action-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  background-color: white;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  background-color: #f3f4f6;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .chat-sidebar {
+    width: 260px; /* 在小屏幕上稍微减小侧边栏宽度 */
+  }
+  
+  .message-list {
+    padding: 0 16px; /* 在小屏幕上减少内边距 */
+  }
+  
+  .chat-input {
+    padding: 16px; /* 在小屏幕上减少内边距 */
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-sidebar {
+    width: 240px; /* 在更小的屏幕上进一步减小侧边栏宽度 */
+  }
+  
+  .sidebar-header {
+    padding: 12px; /* 减少头部内边距 */
+  }
+  
+  .session-list {
+    padding: 4px; /* 减少会话列表内边距 */
+  }
+  
+  .session-item {
+    padding: 8px 12px; /* 减少会话项内边距 */
+  }
 }
 
 /* 深色主题下的工具调用样式 */
