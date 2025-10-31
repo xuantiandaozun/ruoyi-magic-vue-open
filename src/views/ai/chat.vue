@@ -79,19 +79,11 @@
               :value="model.id"
             />
           </el-select>
-          <el-button 
-            type="success" 
-            size="small" 
-            @click="openQuickAddDialog"
-            style="margin-left: 8px;"
-            :icon="Plus"
-          >
-            快速新增
-          </el-button>
+
         </div>
       </div>
       <div>
-        <el-button type="primary" size="small" @click="openModelConfigDialog">模型配置</el-button>
+        
         <el-button type="danger" size="small" @click="clearHistory" style="margin-left:8px;">清空对话</el-button>
       </div>
     </div>
@@ -221,132 +213,7 @@
       </div>
     </div>
     
-    <!-- 模型配置弹窗 -->
-    <el-dialog v-model="modelConfigDialogVisible" title="模型配置管理" width="900px">
-      <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <div style="display:flex; gap:8px;">
-          <el-input v-model="queryParams.provider" placeholder="提供商" clearable style="width:160px;" />
-          <el-input v-model="queryParams.capability" placeholder="能力 (chat,embedding...)" clearable style="width:200px;" />
-          <el-input v-model="queryParams.model" placeholder="模型名称" clearable style="width:200px;" />
-          <el-select v-model="queryParams.enabled" placeholder="是否启用" clearable style="width:140px;">
-            <el-option :value="1" label="启用" />
-            <el-option :value="0" label="禁用" />
-          </el-select>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <el-button type="primary" @click="handleQuery">查询</el-button>
-          <el-button @click="resetQuery">重置</el-button>
-          <el-button type="success" @click="handleAdd">新增</el-button>
-        </div>
-      </div>
-      <el-table :data="modelConfigList" border height="420">
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="provider" label="提供商" width="140" />
-        <el-table-column prop="capability" label="能力" width="140" />
-        <el-table-column prop="model" label="模型" width="180" />
-        <el-table-column prop="endpoint" label="Endpoint" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="enabled" label="启用" width="90">
-          <template #default="scope">
-            <el-tag :type="scope.row.enabled ? 'success' : 'info'">{{ scope.row.enabled ? '是' : '否' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="isDefault" label="默认" width="90">
-          <template #default="scope">
-            <el-tag :type="scope.row.isDefault === 'Y' ? 'warning' : 'info'">{{ scope.row.isDefault === 'Y' ? '默认' : '否' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
-          <template #default="scope">
-            <el-button link type="primary" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button link type="danger" @click="handleDelete(scope.row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div style="display:flex; justify-content:flex-end; margin-top:10px;">
-        <el-pagination
-          background
-          layout="prev, pager, next"
-          :total="total"
-          :page-size="queryParams.pageSize"
-          :current-page="queryParams.pageNum"
-          @current-change="handlePageChange"
-        />
-      </div>
-    </el-dialog>
 
-    <!-- 新增/编辑表单弹窗 -->
-    <el-dialog v-model="formDialogVisible" :title="formTitle" width="700px">
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <el-form-item label="提供商" prop="provider">
-          <el-input v-model="form.provider" placeholder="如 openai, doubao..." />
-        </el-form-item>
-        <el-form-item label="能力" prop="capability">
-          <el-input v-model="form.capability" placeholder="如 chat, embedding..." />
-        </el-form-item>
-        <el-form-item label="模型" prop="model">
-          <el-input v-model="form.model" placeholder="模型名" />
-        </el-form-item>
-        <el-form-item label="API Key" prop="apiKey">
-          <el-input v-model="form.apiKey" type="textarea" :rows="2" placeholder="密钥" />
-        </el-form-item>
-        <el-form-item label="Endpoint" prop="endpoint">
-          <el-input v-model="form.endpoint" placeholder="接口地址" />
-        </el-form-item>
-        <el-form-item label="扩展参数" prop="extraParams">
-          <el-input v-model="form.extraParams" type="textarea" :rows="3" placeholder="JSON 字符串" />
-        </el-form-item>
-        <el-form-item label="启用" prop="enabled">
-          <el-switch v-model="form.enabled" />
-        </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="form.status" placeholder="请选择">
-            <el-option :value="0" label="正常" />
-            <el-option :value="1" label="停用" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="formDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitForm">保存</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- 快速新增模型对话框 -->
-    <el-dialog v-model="quickAddDialogVisible" title="快速新增聊天模型" width="500px">
-      <el-form :model="quickAddForm" :rules="quickAddRules" ref="quickAddFormRef" label-width="100px">
-        <el-form-item label="提供商" prop="provider">
-          <el-select v-model="quickAddForm.provider" placeholder="选择提供商" style="width: 100%;">
-            <el-option value="openai" label="OpenAI" />
-            <el-option value="doubao" label="豆包" />
-            <el-option value="deepseek" label="DeepSeek" />
-            <el-option value="qianwen" label="千问" />
-            <el-option value="glm" label="智谱GLM" />
-            <el-option value="kimi" label="Kimi" />
-            <el-option value="oneapi" label="OneAPI" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="模型名称" prop="model">
-          <el-input v-model="quickAddForm.model" placeholder="如: gpt-3.5-turbo" />
-        </el-form-item>
-        <el-form-item label="API Key" prop="apiKey">
-          <el-input v-model="quickAddForm.apiKey" type="password" placeholder="请输入API密钥" show-password />
-        </el-form-item>
-        <el-form-item label="API端点" prop="endpoint">
-          <el-input v-model="quickAddForm.endpoint" placeholder="如: https://api.openai.com/v1" />
-        </el-form-item>
-        <el-form-item label="设为默认">
-          <el-switch v-model="quickAddForm.setAsDefault" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="quickAddDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitQuickAdd" :loading="quickAddLoading">确定</el-button>
-        </span>
-      </template>
-    </el-dialog>
 
     <!-- 重命名会话对话框 -->
     <el-dialog v-model="renameDialogVisible" title="重命名会话" width="400px">
@@ -362,14 +229,14 @@
         </span>
       </template>
     </el-dialog>
-    </div> <!-- 关闭主聊天区域 -->
-  </div> <!-- 关闭容器 -->
+    </div>
+  </div> 
 </template>
 
 <script setup>
 import { createChatStream, getAvailableChatModels, getChatHistory } from '@/api/ai/chat'
-import { clearAllChatHistory, createChatSession, deleteChatSession, getChatSession, getChatSessions, getSessionMessages, updateChatSession, saveAiMessage } from '@/api/ai/chatSession'
-import { addModelConfig, delModelConfig, getModelConfig, listModelConfigs, updateModelConfig } from '@/api/ai/modelConfig'
+import { clearAllChatHistory, createChatSession, deleteChatSession, getChatSession, getChatSessions, getSessionMessages, saveAiMessage, updateChatSession } from '@/api/ai/chatSession'
+
 import { ArrowLeft, ArrowRight, ChatDotRound, DocumentCopy, MoreFilled, Plus, Tools, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import hljs from 'highlight.js/lib/common'
@@ -517,61 +384,12 @@ const renameRules = {
 const chatModels = ref([])
 const selectedModelId = ref(null)
 
-// 模型配置管理相关
-const modelConfigDialogVisible = ref(false)
-const formDialogVisible = ref(false)
-const formTitle = ref('新增模型配置')
-const formRef = ref()
-const modelConfigList = ref([])
-const total = ref(0)
-const queryParams = ref({
-  pageNum: 1,
-  pageSize: 10,
-  provider: undefined,
-  capability: undefined,
-  model: undefined,
-  enabled: undefined,
-})
-const form = ref({
-  id: undefined,
-  provider: '',
-  capability: '',
-  model: '',
-  apiKey: '',
-  endpoint: '',
-  extraParams: '',
-  enabled: true,
-  status: 0,
-})
-const rules = {
-  provider: [{ required: true, message: '请输入提供商', trigger: 'blur' }],
-  capability: [{ required: true, message: '请输入能力', trigger: 'blur' }],
-  model: [{ required: true, message: '请输入模型', trigger: 'blur' }],
-}
 
-// 快速新增模型相关
-const quickAddDialogVisible = ref(false)
-const quickAddFormRef = ref()
-const quickAddLoading = ref(false)
-const quickAddForm = ref({
-  provider: '',
-  model: '',
-  apiKey: '',
-  endpoint: '',
-  setAsDefault: false
-})
-const quickAddRules = {
-  provider: [{ required: true, message: '请选择提供商', trigger: 'change' }],
-  model: [{ required: true, message: '请输入模型名称', trigger: 'blur' }],
-  apiKey: [{ required: true, message: '请输入API密钥', trigger: 'blur' }],
-  endpoint: [{ required: true, message: '请输入API端点', trigger: 'blur' }],
-}
 
 // 组件挂载时加载会话列表和模型列表
 onMounted(() => {
   loadChatSessions()
   loadChatModels()
-  fetchModelConfigs()
 })
 
 // 加载聊天历史记录
@@ -930,7 +748,7 @@ const handleSend = async () => {
           if (aiMessage && aiMessage.content && currentSessionId.value) {
             await saveAiMessage({
               sessionId: currentSessionId.value,
-              content: aiMessage.content,
+              messageContent: aiMessage.content,
               modelConfigId: selectedModelId.value
             })
             console.log('AI消息已保存到数据库')
@@ -1108,206 +926,9 @@ const handleStop = () => {
   ElMessage.info('已停止对话')
 }
 
-// -------- 模型配置管理逻辑 --------
-const openModelConfigDialog = async () => {
-  modelConfigDialogVisible.value = true
-  await fetchModelConfigs()
-}
 
-const fetchModelConfigs = async () => {
-  try {
-    const res = await listModelConfigs(queryParams.value)
-    if (res.code === 200) {
-      modelConfigList.value = res.rows || res.data || []
-      total.value = res.total || (res.data ? res.data.length : 0)
-    }
-  } catch (e) {
-    console.error('加载模型配置失败', e)
-    ElMessage.error('加载模型配置失败')
-  }
-}
 
-const handleQuery = async () => {
-  queryParams.value.pageNum = 1
-  await fetchModelConfigs()
-}
 
-const resetQuery = async () => {
-  queryParams.value = {
-    pageNum: 1,
-    pageSize: 10,
-    provider: undefined,
-    capability: undefined,
-    model: undefined,
-    enabled: undefined,
-  }
-  await fetchModelConfigs()
-}
-
-const handlePageChange = async (page) => {
-  queryParams.value.pageNum = page
-  await fetchModelConfigs()
-}
-
-const handleAdd = () => {
-  formTitle.value = '新增模型配置'
-  form.value = {
-    id: undefined,
-    provider: '',
-    capability: '',
-    model: '',
-    apiKey: '',
-    endpoint: '',
-    extraParams: '',
-    enabled: true,
-    status: 0,
-  }
-  formDialogVisible.value = true
-}
-
-const normalizeConfig = (data) => {
-  const enabledVal = data?.enabled
-  const statusVal = data?.status
-  return {
-    ...data,
-    enabled: enabledVal === 'Y' || enabledVal === 'y' || enabledVal === 1 || enabledVal === true,
-    status: typeof statusVal === 'string' ? Number(statusVal) : (statusVal ?? 0)
-  }
-}
-
-const handleEdit = async (row) => {
-  formTitle.value = '编辑模型配置'
-  // 先用行数据预填并打开弹窗，提升交互体验
-  form.value = normalizeConfig(row || {})
-  formDialogVisible.value = true
-  try {
-    const res = await getModelConfig(row.id)
-    if (res.code === 200 && res.data) {
-      form.value = normalizeConfig(res.data)
-    }
-  } catch (e) {
-    console.error('获取模型配置详情失败', e)
-    ElMessage.warning('无法获取详情，已使用列表数据预填')
-  }
-}
-
-const submitForm = async () => {
-  try {
-    await formRef.value.validate()
-    const payload = { ...form.value }
-    // 处理 extraParams 为字符串或对象
-    if (typeof payload.extraParams === 'string' && payload.extraParams.trim()) {
-      try {
-        JSON.parse(payload.extraParams)
-      } catch (_) {}
-    }
-    // 类型规范化：enabled -> 'Y'/'N'；status 统一字符串
-    payload.enabled = payload.enabled ? 'Y' : 'N'
-    payload.status = typeof payload.status === 'number' ? String(payload.status) : (payload.status ?? '0')
-
-    let res
-    if (payload.id) {
-      res = await updateModelConfig(payload)
-    } else {
-      res = await addModelConfig(payload)
-    }
-    if (res.code === 200) {
-      ElMessage.success('保存成功')
-      formDialogVisible.value = false
-      await fetchModelConfigs()
-    } else {
-      ElMessage.error(res.msg || '保存失败')
-    }
-  } catch (e) {
-    if (e) {
-      console.error('保存模型配置失败', e)
-      ElMessage.error('保存失败')
-    }
-  }
-}
-
-const handleDelete = async (id) => {
-  try {
-    await ElMessageBox.confirm('确定删除该配置吗？', '提示', { type: 'warning' })
-    const res = await delModelConfig(id)
-    if (res.code === 200) {
-      ElMessage.success('删除成功')
-      await fetchModelConfigs()
-    } else {
-      ElMessage.error(res.msg || '删除失败')
-    }
-  } catch (e) {
-    if (e !== 'cancel') {
-      console.error('删除模型配置失败', e)
-      ElMessage.error('删除失败')
-    }
-  }
-}
-
-// 快速新增模型相关方法
-const openQuickAddDialog = () => {
-  // 重置表单
-  quickAddForm.value = {
-    provider: '',
-    model: '',
-    apiKey: '',
-    endpoint: '',
-    setAsDefault: false
-  }
-  quickAddDialogVisible.value = true
-}
-
-const submitQuickAdd = async () => {
-  try {
-    await quickAddFormRef.value.validate()
-    quickAddLoading.value = true
-    
-    // 构建新增模型的数据
-    const modelData = {
-      provider: quickAddForm.value.provider,
-      capability: 'chat', // 快速新增默认为聊天模型
-      model: quickAddForm.value.model,
-      apiKey: quickAddForm.value.apiKey,
-      endpoint: quickAddForm.value.endpoint,
-      extraParams: JSON.stringify({
-        temperature: 0.7,
-        maxTokens: 4096
-      }),
-      enabled: 'Y',
-      status: '0',
-      isDefault: quickAddForm.value.setAsDefault ? 'Y' : 'N',
-      remark: `快速新增的${quickAddForm.value.provider}聊天模型`
-    }
-    
-    const res = await addModelConfig(modelData)
-    if (res.code === 200) {
-      ElMessage.success('模型新增成功')
-      quickAddDialogVisible.value = false
-      
-      // 刷新聊天模型列表
-      await loadChatModels()
-      
-      // 如果设置为默认，选中新添加的模型
-      if (quickAddForm.value.setAsDefault && res.data && res.data.id) {
-        selectedModelId.value = res.data.id
-        ElMessage.success('已自动选择新添加的模型')
-      } else if (res.data && res.data.id) {
-        // 即使不设为默认，也选中新添加的模型
-        selectedModelId.value = res.data.id
-        ElMessage.success('已自动选择新添加的模型')
-      }
-    } else {
-      ElMessage.error(res.msg || '新增失败')
-    }
-  } catch (e) {
-    if (e) {
-      console.error('快速新增模型失败', e)
-      ElMessage.error('新增失败')
-    }
-  } finally {
-    quickAddLoading.value = false
-  }
-}
 
 // 滚动到底部
 const scrollToBottom = () => {

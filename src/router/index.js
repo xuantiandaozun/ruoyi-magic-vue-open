@@ -61,7 +61,7 @@ export const constantRoutes = [
         path: '/index',
         component: () => import('@/views/index'),
         name: 'Index',
-        meta: { title: '首页', icon: 'dashboard', affix: true }
+        meta: { title: '首页', icon: 'dashboard', affix: true, noCache: false }
       }
     ]
   },
@@ -75,7 +75,7 @@ export const constantRoutes = [
         path: 'profile',
         component: () => import('@/views/system/user/profile/index'),
         name: 'Profile',
-        meta: { title: '个人中心', icon: 'user' }
+        meta: { title: '个人中心', icon: 'user', noCache: false }
       }
     ]
   },
@@ -97,33 +97,39 @@ export const constantRoutes = [
         path: 'chat',
         component: () => import('@/views/ai/chat'),
         name: 'AiChat',
-        meta: { title: 'AI对话', icon: 'chat' }
+        meta: { title: 'AI对话', icon: 'chat', noCache: true }
+      },
+      {
+        path: 'modelConfig',
+        component: () => import('@/views/ai/modelConfig'),
+        name: 'AiModelConfig',
+        meta: { title: '模型配置', icon: 'setting', noCache: false }
       },
       {
         path: 'workflow',
         component: () => import('@/views/ai/workflow'),
         name: 'AiWorkflow',
-        meta: { title: '工作流管理', icon: 'workflow' }
+        meta: { title: '工作流管理', icon: 'workflow', noCache: false }
       },
       {
         path: 'workflowStep',
         component: () => import('@/views/ai/workflowStep'),
         name: 'AiWorkflowStep',
         hidden: true,
-        meta: { title: '工作流步骤', activeMenu: '/ai/workflow' }
+        meta: { title: '工作流步骤', activeMenu: '/ai/workflow', noCache: false }
       },
       {
         path: 'workflowExecution',
         component: () => import('@/views/ai/workflowExecution'),
         name: 'AiWorkflowExecution',
-        meta: { title: '工作流执行', icon: 'play' }
+        meta: { title: '工作流执行', icon: 'play', noCache: false }
       },
       {
         path: 'workflow-schedule-log',
         component: () => import('@/views/ai/workflowScheduleLog'),
         name: 'AiWorkflowScheduleLog',
         hidden: true,
-        meta: { title: '定时任务日志', activeMenu: '/ai/workflow' }
+        meta: { title: '定时任务日志', activeMenu: '/ai/workflow', noCache: false }
       }
     ]
   }
@@ -141,7 +147,7 @@ export const dynamicRoutes = [
         path: 'role/:userId(\\d+)',
         component: () => import('@/views/system/user/authRole'),
         name: 'AuthRole',
-        meta: { title: '分配角色', activeMenu: '/system/user' }
+        meta: { title: '分配角色', activeMenu: '/system/user', noCache: true }
       }
     ]
   },
@@ -155,7 +161,7 @@ export const dynamicRoutes = [
         path: 'user/:roleId(\\d+)',
         component: () => import('@/views/system/role/authUser'),
         name: 'AuthUser',
-        meta: { title: '分配用户', activeMenu: '/system/role' }
+        meta: { title: '分配用户', activeMenu: '/system/role', noCache: true }
       }
     ]
   },
@@ -169,7 +175,7 @@ export const dynamicRoutes = [
         path: 'index/:dictId(\\d+)',
         component: () => import('@/views/system/dict/data'),
         name: 'Data',
-        meta: { title: '字典数据', activeMenu: '/system/dict' }
+        meta: { title: '字典数据', activeMenu: '/system/dict', noCache: false }
       }
     ]
   },
@@ -183,7 +189,7 @@ export const dynamicRoutes = [
         path: 'index/:jobId(\\d+)',
         component: () => import('@/views/monitor/job/log'),
         name: 'JobLog',
-        meta: { title: '调度日志', activeMenu: '/monitor/job' }
+        meta: { title: '调度日志', activeMenu: '/monitor/job', noCache: false }
       }
     ]
   },
@@ -197,7 +203,7 @@ export const dynamicRoutes = [
         path: 'index/:tableId(\\d+)',
         component: () => import('@/views/tool/gen/editTable'),
         name: 'GenEdit',
-        meta: { title: '修改生成配置', activeMenu: '/tool/gen' }
+        meta: { title: '修改生成配置', activeMenu: '/tool/gen', noCache: true }
       }
     ]
   },
@@ -211,7 +217,7 @@ export const dynamicRoutes = [
         path: 'index',
         component: () => import('@/views/tool/gen/previewTable'),
         name: 'PreviewTable',
-        meta: { title: '预览生成表', activeMenu: '/tool/gen' }
+        meta: { title: '预览生成表', activeMenu: '/tool/gen', noCache: true }
       }
     ]
   },
@@ -225,7 +231,7 @@ export const dynamicRoutes = [
         path: 'index',
         component: () => import('@/views/article/blog/index'),
         name: 'Blog',
-        meta: { title: '文章列表' }
+        meta: { title: '文章列表', noCache: false }
       }
     ]
   },
@@ -239,7 +245,7 @@ export const dynamicRoutes = [
         path: 'index',
         component: () => import('@/views/article/blog/editor'),
         name: 'BlogEditor',
-        meta: { title: '博客内容编辑', activeMenu: '/article/blog' }
+        meta: { title: '博客内容编辑', activeMenu: '/article/blog', noCache: true }
       }
     ]
   }
