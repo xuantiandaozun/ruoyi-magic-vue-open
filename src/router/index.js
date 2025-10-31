@@ -100,6 +100,12 @@ export const constantRoutes = [
         meta: { title: 'AI对话', icon: 'chat', noCache: true }
       },
       {
+        path: 'image',
+        component: () => import('@/views/ai/image'),
+        name: 'AiImage',
+        meta: { title: 'AI生图', icon: 'picture', noCache: true }
+      },
+      {
         path: 'modelConfig',
         component: () => import('@/views/ai/modelConfig'),
         name: 'AiModelConfig',

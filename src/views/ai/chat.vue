@@ -235,7 +235,7 @@
 
 <script setup>
 import { createChatStream, getAvailableChatModels, getChatHistory } from '@/api/ai/chat'
-import { clearAllChatHistory, createChatSession, deleteChatSession, getChatSession, getChatSessions, getSessionMessages, saveAiMessage, updateChatSession } from '@/api/ai/chatSession'
+import { clearAllChatHistory, clearSessionHistory, createChatSession, deleteChatSession, getChatSession, getChatSessions, getSessionMessages, saveAiMessage, updateChatSession } from '@/api/ai/chatSession'
 
 import { ArrowLeft, ArrowRight, ChatDotRound, DocumentCopy, MoreFilled, Plus, Tools, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -746,12 +746,20 @@ const handleSend = async () => {
         try {
           const aiMessage = messages.value[aiMessageIndex]
           if (aiMessage && aiMessage.content && currentSessionId.value) {
-            await saveAiMessage({
+            // 准备保存的数据
+            const saveData = {
               sessionId: currentSessionId.value,
               messageContent: aiMessage.content,
               modelConfigId: selectedModelId.value
-            })
-            console.log('AI消息已保存到数据库')
+            }
+            
+            // 如果有工具调用信息，也一并保存
+            if (aiMessage.toolCalls && aiMessage.toolCalls.length > 0) {
+              saveData.toolCalls = JSON.stringify(aiMessage.toolCalls)
+            }
+            
+            await saveAiMessage(saveData)
+            console.log('AI消息已保存到数据库', saveData)
           }
         } catch (error) {
           console.error('保存AI消息失败:', error)
@@ -794,8 +802,14 @@ const handleSend = async () => {
 // 清空对话历史
 const clearHistory = async () => {
   try {
+    // 检查是否有当前会话
+    if (!currentSessionId.value) {
+      ElMessage.warning('当前没有活跃的会话')
+      return
+    }
+    
     await ElMessageBox.confirm(
-      '确定要清空所有对话记录吗？此操作不可恢复。',
+      '确定要清空当前会话的对话记录吗？此操作不可恢复。',
       '确认清空',
       {
         confirmButtonText: '确定',
@@ -804,13 +818,9 @@ const clearHistory = async () => {
       }
     )
     
-    await clearAllChatHistory()
+    await clearSessionHistory(currentSessionId.value)
     messages.value = []
-    chatSessions.value = []
-    currentSessionId.value = null
-    // 创建一个新会话
-    await createNewSession()
-    ElMessage.success('对话记录已清空')
+    ElMessage.success('当前会话的对话记录已清空')
   } catch (error) {
     if (error !== 'cancel') {
       console.error('清空对话失败:', error)

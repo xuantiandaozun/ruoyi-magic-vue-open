@@ -77,6 +77,15 @@ export function clearAllChatHistory() {
   })
 }
 
+// 清空指定会话的历史消息
+export function clearSessionHistory(sessionId) {
+  return request({
+    url: `/ai/chat/sessions/${sessionId}/messages`,
+    method: 'delete',
+    isFullResponse: true
+  })
+}
+
 // 保存AI消息
 export function saveAiMessage(data) {
   return request({
