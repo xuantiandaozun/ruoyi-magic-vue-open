@@ -141,13 +141,13 @@ export const constantRoutes = [
         path: 'blogProductionRecord',
         component: () => import('@/views/ai/blogProductionRecord'),
         name: 'BlogProductionRecord',
-        meta: { title: 'AI博客生产', icon: 'list', noCache: false }
+        meta: { title: 'AI博客生产', noCache: false }
       },
       {
         path: 'coverGenerationRecord',
         component: () => import('@/views/ai/coverGenerationRecord'),
         name: 'CoverGenerationRecord',
-        meta: { title: 'AI生图记录', icon: 'image', noCache: false }
+        meta: { title: 'AI生图记录', noCache: false }
       }
     ]
   }

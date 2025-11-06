@@ -1,15 +1,6 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="博客ID" prop="blogId">
-        <el-input
-          v-model="queryParams.blogId"
-          placeholder="请输入博客ID"
-          clearable
-          style="width: 200px"
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
       <el-form-item label="封面类型" prop="coverType">
         <el-select v-model="queryParams.coverType" placeholder="请选择封面类型" clearable style="width: 200px">
           <el-option label="通用封面" value="0" />
@@ -89,37 +80,37 @@
 
     <el-table v-loading="loading" :data="coverGenerationRecordList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" align="center" prop="id" width="80" />
-      <el-table-column label="博客ID" align="center" prop="blogId" width="100" />
-      <el-table-column label="封面类型" align="center" prop="coverType" width="120">
+      <el-table-column label="博客名称" align="center" prop="blogName" />
+      <el-table-column label="封面类型" align="center" prop="coverType">
         <template #default="scope">
           <el-tag :type="coverTypeColor(scope.row.coverType)">
             {{ coverTypeLabel(scope.row.coverType) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="博客分类" align="center" prop="category" width="120" />
-      <el-table-column label="生成状态" align="center" prop="generationStatus" width="110">
+      <el-table-column label="博客分类" align="center" prop="category" />
+      <el-table-column label="提示词" align="left" prop="prompt" show-overflow-tooltip />
+      <el-table-column label="生成状态" align="center" prop="generationStatus">
         <template #default="scope">
           <el-tag :type="generationStatusColor(scope.row.generationStatus)">
             {{ generationStatusLabel(scope.row.generationStatus) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="使用状态" align="center" prop="isUsed" width="100">
+      <el-table-column label="使用状态" align="center" prop="isUsed">
         <template #default="scope">
           <el-tag :type="scope.row.isUsed === '1' ? 'success' : 'info'">
             {{ scope.row.isUsed === '1' ? '已使用' : '未使用' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="AI模型" align="center" prop="aiModel" width="120" />
-      <el-table-column label="生成时间" align="center" prop="generationTime" width="180">
+      <el-table-column label="AI模型" align="center" prop="aiModel" />
+      <el-table-column label="生成时间" align="center" prop="generationTime">
         <template #default="scope">
           <span>{{ parseTime(scope.row.generationTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="200">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleView(scope.row)" v-hasPermi="['ai:coverGenerationRecord:query']">查看</el-button>
           <el-button link type="success" icon="Picture" @click="handleViewImage(scope.row)" v-if="scope.row.imageUrl" v-hasPermi="['ai:coverGenerationRecord:query']">预览图片</el-button>
@@ -139,8 +130,7 @@
     <!-- 详情对话框 -->
     <el-dialog :title="'生图记录详情'" v-model="detailOpen" width="800px" append-to-body>
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="ID">{{ detailData.id }}</el-descriptions-item>
-        <el-descriptions-item label="博客ID">{{ detailData.blogId }}</el-descriptions-item>
+        <el-descriptions-item label="博客名称">{{ detailData.blogName }}</el-descriptions-item>
         <el-descriptions-item label="封面类型">
           <el-tag :type="coverTypeColor(detailData.coverType)">
             {{ coverTypeLabel(detailData.coverType) }}
@@ -172,12 +162,20 @@
     </el-dialog>
 
     <!-- 图片预览对话框 -->
-    <el-dialog :title="'封面图片预览'" v-model="imageOpen" width="600px" append-to-body>
+    <el-dialog 
+      :title="'封面图片预览'" 
+      v-model="imageOpen" 
+      width="50%" 
+      :modal-append-to-body="true" 
+      destroy-on-close
+      class="image-preview-dialog"
+    >
       <div class="image-preview-container">
         <el-image
           :src="imageUrl"
           fit="contain"
-          style="max-height: 500px; width: 100%;"
+          :preview-src-list="[imageUrl]"
+          :initial-index="0"
         />
       </div>
     </el-dialog>
@@ -207,7 +205,6 @@ const data = reactive({
   queryParams: {
     pageNum: 1,
     pageSize: 10,
-    blogId: null,
     coverType: null,
     category: null,
     generationStatus: null,
@@ -332,12 +329,32 @@ getList();
 </script>
 
 <style scoped>
+.image-preview-dialog :deep(.el-dialog) {
+  margin: 5vh auto;
+  max-width: 60%;
+}
+
+.image-preview-dialog :deep(.el-dialog__header) {
+  padding: 12px 15px 8px;
+}
+
+.image-preview-dialog :deep(.el-dialog__body) {
+  padding: 5px 10px;
+}
+
 .image-preview-container {
   display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
+  height: 70vh;
+  padding: 0;
+}
+
+.image-preview-container :deep(.el-image) {
+  width: 100%;
   height: 100%;
+  max-width: 100%;
 }
 
 .prompt-text {

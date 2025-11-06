@@ -84,7 +84,6 @@
 
     <el-table v-loading="loading" :data="blogProductionRecordList" @selection-change="handleSelectionChange">
       <el-table-column type="selection" width="55" align="center" />
-      <el-table-column label="ID" align="center" prop="id" width="80" />
       <el-table-column label="仓库URL" align="center" prop="repoUrl" min-width="200" show-overflow-tooltip />
       <el-table-column label="仓库标题" align="center" prop="repoTitle" min-width="150" show-overflow-tooltip />
       <el-table-column label="生产类型" align="center" prop="productionType" width="120">
