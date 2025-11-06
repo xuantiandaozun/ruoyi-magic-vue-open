@@ -85,32 +85,6 @@ export function createTable(data) {
   })
 }
 
-// 智能建表
-export function aiDirectTable(data) {
-  return request({
-    url: '/tool/gen/aiDirectTable',
-    method: 'post',
-    data: data,
-    timeout: 120000  // 设置超时时间为 120 秒
-  })
-}
-
-// 智能建表异步接口
-export function aiDirectTableAsync(data) {
-  return request({
-    url: '/tool/gen/aiDirectTableAsync',
-    method: 'post',
-    data: data
-  })
-}
-
-// 查询异步任务状态
-export function getAsyncTaskStatus(taskId) {
-  return request({
-    url: `/tool/async/task/${taskId}`,
-    method: 'get'
-  })
-}
 
 // 创建导入表
 export function createImportTable(data) {
@@ -157,22 +131,6 @@ export function execPermissionSql(tableId) {
   })
 }
 
-// AI优化表字段
-export function aiOptimizeColumns(tableId) {
-  return request({
-    url: '/tool/gen/aiOptimizeColumns/' + tableId,
-    method: 'post',
-    timeout: 120000  // 设置超时时间为 120 秒
-  })
-}
-
-// AI优化表字段异步接口
-export function aiOptimizeColumnsAsync(tableId) {
-  return request({
-    url: '/tool/gen/aiOptimizeColumnsAsync/' + tableId,
-    method: 'post'
-  })
-}
 
 // 修改单个表字段
 export function updateGenTableColumn(data) {

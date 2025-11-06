@@ -54,16 +54,7 @@
           v-hasPermi="['tool:gen:code']"
         >批量生成</el-button>
       </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="Plus"
-          @click="openCreateTable"
-          v-hasRole="['admin']"
-        >创建</el-button>
-      </el-col>
-      <el-col :span="1.5">
+            <el-col :span="1.5">
         <el-button
           type="info"
           plain
@@ -197,7 +188,6 @@
       </el-tabs>
     </el-dialog>
     <import-table ref="importRef" @ok="handleQuery" />
-    <create-table ref="createRef" @ok="handleQuery" />
     
     <!-- 批量生成代码选择对话框 -->
     <el-dialog title="批量生成代码" v-model="genDialog.open" width="500px" append-to-body>
@@ -382,7 +372,6 @@ import { listTable, previewTable, delTable, genCode, synchDb, listDataSources, e
 import { listMenu } from "@/api/system/menu";
 import router from "@/router";
 import importTable from "./importTable";
-import createTable from "./createTable";
 import DirectorySelector from "@/components/DirectorySelector/index.vue";
 import { Folder, QuestionFilled } from '@element-plus/icons-vue';
 
@@ -549,16 +538,71 @@ function submitGenForm() {
     genType: genDialog.value.form.genType
   };
   
+  console.log('提交生成代码表单:', data);
+  
   try {
     if (genDialog.value.form.genMode === 'download') {
       // 下载代码
       batchDownload(data).then(response => {
+        console.log('下载响应:', response);
         loading.close();
-        proxy.$download.saveAs(response, 'ruoyi-code.zip');
+        
+        // 检查响应是否为blob类型
+        if (!(response.data instanceof Blob)) {
+          console.error('响应数据不是blob类型:', response.data);
+          proxy.$modal.msgError("下载失败：响应数据格式错误");
+          return;
+        }
+        
+        console.log('blob大小:', response.data.size, '类型:', response.data.type);
+        
+        // 从响应头获取文件名，如果没有则使用默认名称
+        const contentDisposition = response.headers['content-disposition'];
+        console.log('Content-Disposition:', contentDisposition);
+        let fileName = 'ruoyi-code.zip';
+        
+        if (contentDisposition) {
+          // 处理可能的编码文件名
+          const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (fileNameMatch && fileNameMatch[1]) {
+            let extractedFileName = fileNameMatch[1].replace(/['"]/g, '');
+            
+            // 处理UTF-8编码的文件名 (filename*=UTF-8''encoded_filename)
+            const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/);
+            if (utf8Match && utf8Match[1]) {
+              try {
+                extractedFileName = decodeURIComponent(utf8Match[1]);
+              } catch (e) {
+                console.warn('解码UTF-8文件名失败:', e);
+              }
+            }
+            
+            fileName = extractedFileName;
+          }
+        }
+        
+        console.log('最终文件名:', fileName);
+        
+        // 使用原生方式创建下载链接
+        const url = window.URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        
+        // 清理
+        setTimeout(() => {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        }, 100);
+        
         genDialog.value.open = false;
         proxy.$modal.msgSuccess("代码生成成功");
-      }).catch(() => {
+      }).catch((error) => {
         loading.close();
+        console.error('下载失败:', error);
+        proxy.$modal.msgError("下载失败，请稍后重试");
       });
     } else {
       // 生成到自定义路径
@@ -573,6 +617,7 @@ function submitGenForm() {
   } catch (error) {
     loading.close();
     console.error("生成代码出错:", error);
+    proxy.$modal.msgError("生成代码出错，请稍后重试");
   }
 }
 
@@ -608,10 +653,6 @@ function openImportTable() {
   proxy.$refs["importRef"].show();
 }
 
-/** 打开创建表弹窗 */
-function openCreateTable() {
-  proxy.$refs["createRef"].show();
-}
 
 /** 重置按钮操作 */
 function resetQuery() {

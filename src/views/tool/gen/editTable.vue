@@ -19,10 +19,7 @@
             <el-col :span="1.5">
               <el-button type="success" plain icon="Plus" @click="handleAddDefaultFields">添加默认字段</el-button>
             </el-col>
-            <el-col :span="1.5">
-              <el-button type="warning" plain icon="Magic" @click="handleAiOptimize">AI优化字段</el-button>
-            </el-col>
-          </el-row>
+                      </el-row>
           <el-table ref="dragTable" :data="columns" row-key="columnId" :max-height="tableHeight"
             @selection-change="handleSelectionChange">
             <el-table-column type="selection" width="55" />
@@ -268,66 +265,12 @@
       </template>
     </el-drawer>
 
-    <!-- AI优化字段状态弹窗 -->
-    <el-dialog title="AI优化字段" v-model="statusVisible" width="500px" top="20vh" append-to-body
-      :close-on-click-modal="false" :close-on-press-escape="false">
-      <div class="status-container">
-        <div class="status-icon">
-          <el-icon v-if="taskStatus === 'PENDING'" class="loading-icon" size="48" color="#409EFF">
-            <Clock />
-          </el-icon>
-          <el-icon v-else-if="taskStatus === 'RUNNING'" class="loading-icon rotating" size="48" color="#409EFF">
-            <Loading />
-          </el-icon>
-          <el-icon v-else-if="taskStatus === 'SUCCESS'" size="48" color="#67C23A">
-            <SuccessFilled />
-          </el-icon>
-          <el-icon v-else-if="taskStatus === 'FAILED'" size="48" color="#F56C6C">
-            <CircleCloseFilled />
-          </el-icon>
-        </div>
-        <div class="status-text">
-          <h3 v-if="taskStatus === 'PENDING'">等待中...</h3>
-          <h3 v-else-if="taskStatus === 'RUNNING'">AI优化中...</h3>
-          <h3 v-else-if="taskStatus === 'SUCCESS'">优化成功！</h3>
-          <h3 v-else-if="taskStatus === 'FAILED'">优化失败</h3>
-          <p v-if="taskStatus === 'PENDING'" class="status-desc">任务已提交，正在等待处理</p>
-          <p v-else-if="taskStatus === 'RUNNING'" class="status-desc">
-            <span v-if="extraInfo && extraInfo.currentAction">
-              <template v-if="extraInfo.currentAction === '创建表定义'">
-                正在{{ extraInfo.currentAction }}：{{ extraInfo.tableName }} ({{ extraInfo.tableComment }})
-              </template>
-              <template v-else-if="extraInfo.currentAction === '创建表结构'">
-                正在{{ extraInfo.currentAction }}：{{ extraInfo.tableName }}，共{{ extraInfo.fieldCount }}个字段
-              </template>
-              <template v-else-if="extraInfo.currentAction === '同步表到数据库'">
-                正在{{ extraInfo.currentAction }}：{{ extraInfo.tableName }}
-              </template>
-              <template v-else-if="extraInfo.currentAction === '优化字段'">
-                正在{{ extraInfo.currentAction }}：{{ extraInfo.columnName }}
-              </template>
-              <template v-else>
-                {{ extraInfo.currentAction }}
-              </template>
-            </span>
-            <span v-else>AI正在分析并优化字段，请稍候...</span>
-          </p>
-          <p v-else-if="taskStatus === 'SUCCESS'" class="status-desc">字段已成功优化</p>
-          <p v-else-if="taskStatus === 'FAILED'" class="status-desc">{{ errorMessage || '优化过程中出现错误，请重试' }}</p>
-        </div>
-      </div>
-      <template #footer v-if="taskStatus === 'FAILED' || taskStatus === 'SUCCESS'">
-        <div class="dialog-footer">
-          <el-button type="primary" @click="closeStatusDialog">确 定</el-button>
-        </div>
-      </template>
-    </el-dialog>
-  </div>
+    </div>
 </template>
 
 <script setup name="GenEdit">
-import { getGenTable, updateGenTable, aiOptimizeColumns, aiOptimizeColumnsAsync, getAsyncTaskStatus, updateGenTableColumn } from "@/api/tool/gen";
-import { Clock, Loading, SuccessFilled, CircleCloseFilled, Document, Lock, Search, Monitor, Collection, DataBoard, Key } from '@element-plus/icons-vue';
+import { getGenTable, updateGenTable, updateGenTableColumn } from "@/api/tool/gen";
+import { Document, Lock, Search, Monitor, Collection, DataBoard, Key } from '@element-plus/icons-vue';
 import { optionselect as getDictOptionselect } from "@/api/system/dict/type";
 import basicInfoForm from "./basicInfoForm";
 import genInfoForm from "./genInfoForm";
@@ -350,13 +293,6 @@ const drawerVisible = ref(false);
 const currentColumn = ref(null);
 const currentColumnIndex = ref(-1);
 
-// AI优化字段异步任务相关变量
-const statusVisible = ref(false);
-const taskStatus = ref('');
-const taskId = ref('');
-const errorMessage = ref('');
-const pollTimer = ref(null);
-const extraInfo = ref(null);
 
 // 计算属性：检查是否有select类型的字段
 const hasSelectType = computed(() => {
@@ -491,118 +427,6 @@ function handleDelete() {
   });
 }
 
-/** AI优化字段设置 */
-function handleAiOptimize() {
-  const tableId = route.params && route.params.tableId;
-  if (!tableId) {
-    proxy.$modal.msgError("表ID不能为空");
-    return;
-  }
-
-  proxy.$modal.confirm('确认要使用AI优化当前表的字段设置吗？').then(() => {
-    aiOptimizeColumnsAsync(tableId).then(data => {
-      // 获取任务ID
-      taskId.value = data;
-      // 显示状态弹窗
-      showStatusDialog();
-      // 开始轮询
-      startPolling();
-    }).catch(err => {
-      proxy.$modal.msgError("提交AI优化任务失败: " + err.message);
-    });
-  });
-}
-
-/** 显示状态弹窗 */
-function showStatusDialog() {
-  statusVisible.value = true;
-  taskStatus.value = 'PENDING';
-  errorMessage.value = '';
-  extraInfo.value = null;
-}
-
-/** 关闭状态弹窗 */
-function closeStatusDialog() {
-  statusVisible.value = false;
-  stopPolling();
-  taskStatus.value = '';
-  taskId.value = '';
-  errorMessage.value = '';
-  extraInfo.value = null;
-}
-
-/** 开始轮询任务状态 */
-function startPolling() {
-  if (pollTimer.value) {
-    clearInterval(pollTimer.value);
-  }
-
-  pollTimer.value = setInterval(() => {
-    checkTaskStatus();
-  }, 2000); // 每2秒轮询一次
-}
-
-/** 停止轮询 */
-function stopPolling() {
-  if (pollTimer.value) {
-    clearInterval(pollTimer.value);
-    pollTimer.value = null;
-  }
-}
-
-/** 检查任务状态 */
-function checkTaskStatus() {
-  if (!taskId.value) return;
-
-  getAsyncTaskStatus(taskId.value).then(res => {
-    if (res.code === 200) {
-      const data = res.data;
-      const status = data.status;
-      taskStatus.value = status;
-
-      // 解析extraInfo
-      if (data.extraInfo) {
-        try {
-          extraInfo.value = JSON.parse(data.extraInfo);
-        } catch (e) {
-          console.error('解析extraInfo失败:', e);
-          extraInfo.value = null;
-        }
-      }
-
-      if (status === 'SUCCESS') {
-        stopPolling();
-        // 延迟1秒后关闭弹窗并刷新数据
-        setTimeout(() => {
-          closeStatusDialog();
-          proxy.$modal.msgSuccess('AI优化字段成功！');
-          // 刷新表格数据
-          const tableId = route.params && route.params.tableId;
-          getGenTable(tableId).then(res => {
-            columns.value = res.rows;
-            info.value = res.info;
-            tables.value = res.tables;
-          });
-        }, 1000);
-      } else if (status === 'FAILED') {
-        stopPolling();
-        errorMessage.value = data.errorMessage || '任务执行失败';
-      }
-      // PENDING 和 RUNNING 状态继续轮询
-    } else {
-      proxy.$modal.msgError(res.msg || "获取任务状态失败");
-    }
-  }).catch(error => {
-    stopPolling();
-    taskStatus.value = 'FAILED';
-    errorMessage.value = '查询任务状态失败：' + error.message;
-  });
-}
-
-// 组件销毁时清理定时器
-onBeforeUnmount(() => {
-  stopPolling();
-});
 
 /** 编辑字段详细配置 */
 function handleEdit(row, index) {
@@ -830,45 +654,6 @@ function setTableColumns(tableName) {
   text-align: center;
 }
 
-.status-container {
-  text-align: center;
-  padding: 20px 0;
-}
-
-.status-icon {
-  margin-bottom: 20px;
-}
-
-.loading-icon {
-  display: inline-block;
-}
-
-.rotating {
-  animation: rotate 2s linear infinite;
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.status-text h3 {
-  margin: 0 0 10px 0;
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.status-text .status-desc {
-  margin: 0;
-  color: #666;
-  font-size: 14px;
-  line-height: 1.5;
-}
 
 .drawer-content {
   padding: 0 20px;
