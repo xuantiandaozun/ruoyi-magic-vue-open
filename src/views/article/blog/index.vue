@@ -157,8 +157,9 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="240">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="300">
         <template #default="scope">
+          <el-button link type="primary" icon="Picture" @click="handleSetCover(scope.row)" v-hasPermi="['article:blog:edit']">设置封面</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['article:blog:edit']">修改</el-button>
           <el-button link type="success" icon="EditPen" @click="handleEditContent(scope.row)" v-hasPermi="['article:blog:edit']">编辑内容</el-button>
           <el-button link type="warning" icon="Search" @click="handleSeoOptimize(scope.row)" v-hasPermi="['article:blog:edit']">SEO优化</el-button>
@@ -260,13 +261,72 @@
       </template>
     </el-dialog>
 
+    <!-- 设置封面对话框 -->
+    <el-dialog 
+      v-model="setCoverOpen" 
+      title="设置封面"
+      width="auto"
+      :style="{minWidth: '300px', maxWidth: '90vw'}"
+      append-to-body
+      class="set-cover-dialog"
+    >
+      <!-- 搜索栏 -->
+      <div class="cover-search-bar">
+        <el-input
+          v-model="coverSearchText"
+          placeholder="搜索提示词..."
+          clearable
+          @input="handleCoverSearch"
+          style="width: 100%; max-width: 300px;"
+        />
+      </div>
+
+      <div v-loading="setCoverLoading" style="min-height: 200px;">
+        <el-empty v-if="filteredCoverList.length === 0" description="暂无可用的封面" />
+        <div v-else class="cover-grid">
+          <div 
+            v-for="cover in filteredCoverList" 
+            :key="cover.id" 
+            class="cover-item"
+            :class="{ selected: selectedCoverId === cover.id }"
+            @click="selectedCoverId = cover.id"
+          >
+            <img :src="cover.imageUrl" :alt="cover.prompt" class="cover-thumbnail" />
+            <div class="cover-info">
+              <p class="cover-prompt">{{ cover.prompt }}</p>
+              <p class="cover-time">{{ parseTime(cover.generationTime, '{y}-{m}-{d} {h}:{i}') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分页 -->
+      <div v-if="searchedCoverList.length > 0" class="cover-pagination">
+        <el-pagination
+          v-model:current-page="coverPageNum"
+          v-model:page-size="coverPageSize"
+          :page-sizes="[12, 24, 36, 48]"
+          :total="searchedCoverList.length"
+          layout="total, sizes, prev, pager, next"
+        />
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="setCoverOpen = false">取 消</el-button>
+          <el-button type="primary" @click="confirmSetCover" :disabled="!selectedCoverId">确 定</el-button>
+        </div>
+      </template>
+    </el-dialog>
 
   </div>
 </template>
 
 <script setup name="Blog">
 import { addBlog, delBlog, generateAiImage, getBlog, getFeishuDocOptions, listBlog, polishBlog, seoBlog, updateBlog } from "@/api/article/blog";
-import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
+import { listUnusedRecords } from "@/api/ai/coverGenerationRecord";
+import { getEnBlogByZhBlogId, updateEnBlog } from "@/api/article/enBlog";
+import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 const { proxy } = getCurrentInstance();
@@ -306,6 +366,18 @@ const aiPolishRules = ref({
 
 // SEO优化相关数据
 const seoOptimizeLoading = ref(false);
+
+// 设置封面相关数据
+const setCoverOpen = ref(false);
+const setCoverLoading = ref(false);
+const coverList = ref([]);
+const currentBlogItem = ref(null);
+const selectedCoverId = ref(null);
+const coverSearchText = ref("");
+const coverPageNum = ref(1);
+const coverPageSize = ref(12);
+const searchedCoverList = ref([]);
+const filteredCoverList = ref([]);
 
 const data = reactive({
   form: {},
@@ -542,15 +614,9 @@ async function handleAutoImage() {
   autoImageLoading.value = true;
   try {
     const response = await generateAiImage();
-    if (response.success) {
-      proxy.$modal.msgSuccess(response.message || "自动配图任务已开始处理，图片将在后台生成");
-      // 刷新列表以显示可能的新图片
-      setTimeout(() => {
-        getList();
-      }, 2000);
-    } else {
-      proxy.$modal.msgError(response.message || "自动配图失败");
-    }
+    proxy.$modal.msgSuccess(response.msg || "自动配图完成");
+    // 刷新列表以显示新设置的封面
+    getList();
   } catch (error) {
     proxy.$modal.msgError("自动配图失败：" + (error.message || error));
   } finally {
@@ -625,8 +691,121 @@ async function handleSeoOptimize(row) {
   }
 }
 
+/** 打开设置封面对话框 */
+async function handleSetCover(item) {
+  currentBlogItem.value = item;
+  selectedCoverId.value = null;
+  coverSearchText.value = "";
+  coverPageNum.value = 1;
+  coverPageSize.value = 12;
+  setCoverOpen.value = true;
+  setCoverLoading.value = true;
+  
+  try {
+    const response = await listUnusedRecords();
+    coverList.value = response;
+    updateSearchedList();
+    updateFilteredCoverList();
+  } catch (error) {
+    proxy.$modal.msgError("获取封面列表失败：" + error);
+  } finally {
+    setCoverLoading.value = false;
+  }
+}
 
+/** 搜索封面 */
+function handleCoverSearch() {
+  coverPageNum.value = 1;
+  updateSearchedList();
+  updateFilteredCoverList();
+}
 
+/** 更新搜索结果列表 */
+function updateSearchedList() {
+  let searched = coverList.value;
+  
+  // 按搜索文本过滤
+  if (coverSearchText.value.trim()) {
+    const searchLower = coverSearchText.value.toLowerCase();
+    searched = searched.filter(cover => 
+      cover.prompt.toLowerCase().includes(searchLower)
+    );
+  }
+  
+  searchedCoverList.value = searched;
+}
+
+/** 更新过滤后的封面列表（分页） */
+function updateFilteredCoverList() {
+  const start = (coverPageNum.value - 1) * coverPageSize.value;
+  const end = start + coverPageSize.value;
+  filteredCoverList.value = searchedCoverList.value.slice(start, end);
+}
+
+/** 分页改变 */
+function handleCoverPagination() {
+  updateFilteredCoverList();
+}
+
+// 监听分页变量变化
+watch([coverPageNum, coverPageSize], () => {
+  updateFilteredCoverList();
+});
+
+/** 确认设置封面 */
+async function confirmSetCover() {
+  if (!currentBlogItem.value || !selectedCoverId.value) {
+    proxy.$modal.msgWarning("请选择一个封面");
+    return;
+  }
+  
+  setCoverLoading.value = true;
+  try {
+    // 获取选中的封面信息
+    const selectedCover = coverList.value.find(c => c.id === selectedCoverId.value);
+    if (!selectedCover) {
+      proxy.$modal.msgError("封面信息不存在");
+      return;
+    }
+    
+    // 更新中文博客的封面
+    const updateData = {
+      blogId: currentBlogItem.value.blogId,
+      coverImage: selectedCover.imageUrl
+    };
+    
+    await updateBlog(updateData);
+    
+    // 查找并更新关联的英文博客封面
+    try {
+      const enBlogResponse = await getEnBlogByZhBlogId(currentBlogItem.value.blogId);
+      console.log("英文博客查询结果:", enBlogResponse);
+      
+      // 检查响应数据是否有效
+      if (enBlogResponse && typeof enBlogResponse === 'object' && enBlogResponse.blogId) {
+        const enUpdateData = {
+          blogId: enBlogResponse.blogId,
+          coverImage: selectedCover.imageUrl
+        };
+        console.log("英文博客更新数据:", enUpdateData);
+        await updateEnBlog(enUpdateData);
+      } else {
+        console.log("未找到关联的英文博客或blogId为空，响应数据:", enBlogResponse);
+      }
+    } catch (enError) {
+      console.warn("英文博客封面更新失败，但中文博客已更新成功：", enError);
+      // 如果是英文博客更新失败，不应该影响整体的成功提示
+    }
+    
+    proxy.$modal.msgSuccess("设置封面成功");
+    setCoverOpen.value = false;
+    getList();
+  } catch (error) {
+    proxy.$modal.msgError("设置封面失败：" + error);
+  } finally {
+    setCoverLoading.value = false;
+  }
+}
 
 
 
@@ -679,6 +858,90 @@ onUnmounted(() => {
 
 .dialog-footer {
   text-align: right;
+}
+
+/* 搜索栏 */
+.cover-search-bar {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* 分页 */
+.cover-pagination {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+}
+
+.cover-item {
+  position: relative;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  background-color: #f5f7fa;
+}
+
+.cover-item:hover {
+  border-color: #409eff;
+  transform: scale(1.02);
+}
+
+.cover-item.selected {
+  border-color: #409eff;
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.2);
+}
+
+.cover-thumbnail {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+}
+
+.cover-info {
+  padding: 8px;
+  background-color: #fff;
+  border-top: 1px solid #ebeef5;
+}
+
+.cover-prompt {
+  margin: 0;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.cover-time {
+  margin: 4px 0 0 0;
+  font-size: 11px;
+  color: #909399;
+}
+
+@media (max-width: 768px) {
+  .cover-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  
+  .cover-thumbnail {
+    height: 120px;
+  }
 }
 </style>
 

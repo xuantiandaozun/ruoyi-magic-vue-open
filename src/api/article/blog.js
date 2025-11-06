@@ -63,8 +63,8 @@ export function polishBlog(data) {
 // 自动配图
 export function generateAiImage() {
   return request({
-    url: '/magic/admin/blog/aiimage',
-    method: 'get'
+    url: '/article/blog/autoAssignCovers',
+    method: 'post'
   })
 }
 

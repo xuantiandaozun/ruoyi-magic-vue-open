@@ -51,3 +51,11 @@ export function seoEnBlog(data) {
     data: data
   })
 }
+
+// 根据中文博客ID查询对应的英文博客
+export function getEnBlogByZhBlogId(zhBlogId) {
+  return request({
+    url: '/article/enBlog/byZhBlogId/' + zhBlogId,
+    method: 'get'
+  })
+}

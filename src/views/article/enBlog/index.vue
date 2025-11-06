@@ -101,8 +101,9 @@
       </el-table-column>
       <el-table-column label="浏览次数" align="center" prop="viewCount" width="100" />
       <el-table-column label="点赞次数" align="center" prop="likeCount" width="100" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="200">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="250">
         <template #default="scope">
+          <el-button link type="primary" icon="Picture" @click="handleSetCover(scope.row)" v-hasPermi="['article:enBlog:edit']">设置封面</el-button>
           <el-button link type="warning" icon="Search" @click="handleSeoOptimize(scope.row)" v-hasPermi="['article:enBlog:edit']">英文SEO优化</el-button>
           <el-button
             link
@@ -123,13 +124,71 @@
       @pagination="getList"
     />
 
+    <!-- 设置封面对话框 -->
+    <el-dialog 
+      v-model="setCoverOpen" 
+      title="设置封面"
+      width="auto"
+      :style="{minWidth: '300px', maxWidth: '90vw'}"
+      append-to-body
+      class="set-cover-dialog"
+    >
+      <!-- 搜索栏 -->
+      <div class="cover-search-bar">
+        <el-input
+          v-model="coverSearchText"
+          placeholder="搜索提示词..."
+          clearable
+          @input="handleCoverSearch"
+          style="width: 100%; max-width: 300px;"
+        />
+      </div>
+
+      <div v-loading="setCoverLoading" style="min-height: 200px;">
+        <el-empty v-if="filteredCoverList.length === 0" description="暂无可用的封面" />
+        <div v-else class="cover-grid">
+          <div 
+            v-for="cover in filteredCoverList" 
+            :key="cover.id" 
+            class="cover-item"
+            :class="{ selected: selectedCoverId === cover.id }"
+            @click="selectedCoverId = cover.id"
+          >
+            <img :src="cover.imageUrl" :alt="cover.prompt" class="cover-thumbnail" />
+            <div class="cover-info">
+              <p class="cover-prompt">{{ cover.prompt }}</p>
+              <p class="cover-time">{{ parseTime(cover.generationTime, '{y}-{m}-{d} {h}:{i}') }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分页 -->
+      <div v-if="searchedCoverList.length > 0" class="cover-pagination">
+        <el-pagination
+          v-model:current-page="coverPageNum"
+          v-model:page-size="coverPageSize"
+          :page-sizes="[12, 24, 36, 48]"
+          :total="searchedCoverList.length"
+          layout="total, sizes, prev, pager, next"
+        />
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="setCoverOpen = false">取 消</el-button>
+          <el-button type="primary" @click="confirmSetCover" :disabled="!selectedCoverId">确 定</el-button>
+        </div>
+      </template>
+    </el-dialog>
 
   </div>
 </template>
 
 <script setup name="EnBlog">
-import { listEnBlog, delEnBlog, seoEnBlog } from "@/api/article/enBlog";
-import { onMounted, onUnmounted, getCurrentInstance, ref, reactive, toRefs } from 'vue';
+import { listEnBlog, delEnBlog, seoEnBlog, updateEnBlog } from "@/api/article/enBlog";
+import { listUnusedRecords } from "@/api/ai/coverGenerationRecord";
+import { onMounted, onUnmounted, getCurrentInstance, ref, reactive, toRefs, watch } from 'vue';
 
 const { proxy } = getCurrentInstance();
 // 模板引用
@@ -146,6 +205,18 @@ const multiple = ref(true);
 
 // SEO优化相关数据
 const seoOptimizeLoading = ref(false);
+
+// 设置封面相关数据
+const setCoverOpen = ref(false);
+const setCoverLoading = ref(false);
+const coverList = ref([]);
+const currentEnBlogItem = ref(null);
+const selectedCoverId = ref(null);
+const coverSearchText = ref("");
+const coverPageNum = ref(1);
+const coverPageSize = ref(12);
+const searchedCoverList = ref([]);
+const filteredCoverList = ref([]);
 
 const data = reactive({
   queryParams: {
@@ -245,6 +316,101 @@ async function handleSeoOptimize(row) {
   }
 }
 
+/** 打开设置封面对话框 */
+async function handleSetCover(item) {
+  currentEnBlogItem.value = item;
+  selectedCoverId.value = null;
+  coverSearchText.value = "";
+  coverPageNum.value = 1;
+  coverPageSize.value = 12;
+  setCoverOpen.value = true;
+  setCoverLoading.value = true;
+  
+  try {
+    const response = await listUnusedRecords();
+    coverList.value = response;
+    updateSearchedList();
+    updateFilteredCoverList();
+  } catch (error) {
+    proxy.$modal.msgError("获取封面列表失败：" + error);
+  } finally {
+    setCoverLoading.value = false;
+  }
+}
+
+/** 搜索封面 */
+function handleCoverSearch() {
+  coverPageNum.value = 1;
+  updateSearchedList();
+  updateFilteredCoverList();
+}
+
+/** 更新搜索结果列表 */
+function updateSearchedList() {
+  let searched = coverList.value;
+  
+  // 按搜索文本过滤
+  if (coverSearchText.value.trim()) {
+    const searchLower = coverSearchText.value.toLowerCase();
+    searched = searched.filter(cover => 
+      cover.prompt.toLowerCase().includes(searchLower)
+    );
+  }
+  
+  searchedCoverList.value = searched;
+}
+
+/** 更新过滤后的封面列表（分页） */
+function updateFilteredCoverList() {
+  const start = (coverPageNum.value - 1) * coverPageSize.value;
+  const end = start + coverPageSize.value;
+  filteredCoverList.value = searchedCoverList.value.slice(start, end);
+}
+
+/** 分页改变 */
+function handleCoverPagination() {
+  updateFilteredCoverList();
+}
+
+// 监听分页变量变化
+watch([coverPageNum, coverPageSize], () => {
+  updateFilteredCoverList();
+});
+
+/** 确认设置封面 */
+async function confirmSetCover() {
+  if (!currentEnBlogItem.value || !selectedCoverId.value) {
+    proxy.$modal.msgWarning("请选择一个封面");
+    return;
+  }
+  
+  setCoverLoading.value = true;
+  try {
+    // 获取选中的封面信息
+    const selectedCover = coverList.value.find(c => c.id === selectedCoverId.value);
+    if (!selectedCover) {
+      proxy.$modal.msgError("封面信息不存在");
+      return;
+    }
+    
+    // 更新英文博客的封面
+    const updateData = {
+      blogId: currentEnBlogItem.value.blogId,
+      coverImage: selectedCover.imageUrl
+    };
+    
+    await updateEnBlog(updateData);
+    
+    proxy.$modal.msgSuccess("设置封面成功");
+    setCoverOpen.value = false;
+    getList();
+  } catch (error) {
+    proxy.$modal.msgError("设置封面失败：" + error);
+  } finally {
+    setCoverLoading.value = false;
+  }
+}
+
 // 在组件挂载后执行查询操作
 onMounted(() => {
   getList();
@@ -255,6 +421,109 @@ onUnmounted(() => {
   // 确保所有加载状态被重置，防止内存泄漏
   loading.value = false;
   seoOptimizeLoading.value = false;
+  setCoverLoading.value = false;
 });
 </script>
 
+<style scoped>
+.flexible-search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.search-item {
+  flex: 0 0 auto;
+  min-width: 200px;
+}
+
+.search-buttons {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* 搜索栏 */
+.cover-search-bar {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* 分页 */
+.cover-pagination {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+}
+
+.cover-item {
+  position: relative;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  background-color: #f5f7fa;
+}
+
+.cover-item:hover {
+  border-color: #409eff;
+  transform: scale(1.02);
+}
+
+.cover-item.selected {
+  border-color: #409eff;
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.2);
+}
+
+.cover-thumbnail {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+}
+
+.cover-info {
+  padding: 8px;
+  background-color: #fff;
+  border-top: 1px solid #ebeef5;
+}
+
+.cover-prompt {
+  margin: 0;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.cover-time {
+  margin: 4px 0 0 0;
+  font-size: 11px;
+  color: #909399;
+}
+
+@media (max-width: 768px) {
+  .cover-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  
+  .cover-thumbnail {
+    height: 120px;
+  }
+}
+</style>

@@ -52,3 +52,11 @@ export function exportCoverGenerationRecord(query) {
     responseType: 'blob'
   })
 }
+
+// 查询未使用的记录
+export function listUnusedRecords() {
+  return request({
+    url: '/ai/coverGenerationRecord/listUnusedRecords',
+    method: 'get'
+  })
+}
