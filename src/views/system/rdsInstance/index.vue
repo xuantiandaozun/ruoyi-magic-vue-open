@@ -1,5 +1,80 @@
 <template>
   <div class="app-container">
+    <!-- 客户端IP信息卡片 -->
+    <el-card class="client-ip-card" shadow="never">
+      <div class="client-ip-info">
+        <el-icon class="client-ip-icon"><Monitor /></el-icon>
+        <span class="client-ip-label">当前客户端IP：</span>
+        <el-tag 
+          v-if="clientIpLoading" 
+          type="info" 
+          effect="light"
+          size="small"
+        >
+          <el-icon class="is-loading"><Loading /></el-icon>
+          获取中...
+        </el-tag>
+        <el-tag 
+          v-else-if="clientIp === '获取失败'" 
+          type="danger" 
+          effect="light"
+          size="small"
+        >
+          获取失败
+        </el-tag>
+        <el-tag 
+          v-else-if="isIPv6" 
+          type="warning" 
+          effect="light"
+          size="small"
+        >
+          {{ clientIp }} (IPv6)
+        </el-tag>
+        <el-tag 
+          v-else 
+          type="success" 
+          effect="light"
+          size="small"
+        >
+          {{ clientIp }}
+        </el-tag>
+        
+        <!-- 地理位置信息 -->
+        <template v-if="!clientIpLoading && clientIp !== '获取失败' && clientLocation">
+          <span class="location-separator">|</span>
+          <el-icon class="location-icon"><Location /></el-icon>
+          <span class="location-text">
+            {{ clientLocation.country }}
+            <template v-if="clientLocation.region && clientLocation.region !== '未知'">
+              · {{ clientLocation.region }}
+            </template>
+            <template v-if="clientLocation.city && clientLocation.city !== '未知' && clientLocation.city !== '内部'">
+              · {{ clientLocation.city }}
+            </template>
+          </span>
+          <el-tag 
+            v-if="clientLocation.isp && clientLocation.isp !== '未知' && clientLocation.isp !== '局域网'"
+            type="info" 
+            effect="plain"
+            size="small"
+            class="isp-tag"
+          >
+            {{ clientLocation.isp }}
+          </el-tag>
+        </template>
+        
+        <el-button 
+          type="text" 
+          icon="Refresh" 
+          @click="fetchClientIp"
+          :loading="clientIpLoading"
+          size="small"
+          class="refresh-ip-btn"
+          title="刷新IP"
+        ></el-button>
+      </div>
+    </el-card>
+    
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="auto" class="flexible-search-form">
       <el-form-item label="实例ID" prop="dbInstanceId" class="search-item">
         <el-input
@@ -437,7 +512,7 @@
 </template>
 
 <script setup name="RdsInstance">
-import { addRdsInstance, delRdsInstance, getRdsInstance, getRdsInstanceNetInfo, getRdsInstanceIPArrayList, modifyRdsInstanceSecurityIps, listRdsInstance, syncAliyunRdsInstances, updateRdsInstance, updateAllRdsClientWhitelist } from "@/api/system/rdsInstance";
+import { addRdsInstance, delRdsInstance, getRdsInstance, getRdsInstanceNetInfo, getRdsInstanceIPArrayList, modifyRdsInstanceSecurityIps, listRdsInstance, syncAliyunRdsInstances, updateRdsInstance, updateAllRdsClientWhitelist, getClientIp } from "@/api/system/rdsInstance";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
@@ -456,6 +531,12 @@ const single = ref(true);
 const multiple = ref(true);
 const total = ref(0);
 const title = ref("");
+
+// 客户端IP相关变量
+const clientIp = ref("");
+const clientIpLoading = ref(false);
+const clientLocation = ref(null);
+const isIPv6 = ref(false);
 
 // 连接信息相关变量
 const netInfoOpen = ref(false);
@@ -801,9 +882,37 @@ async function handleUpdateAllClientWhitelist() {
   }
 }
 
+/** 获取客户端IP地址 */
+async function fetchClientIp() {
+  if (clientIpLoading.value) return; // 防止重复请求
+  
+  clientIpLoading.value = true;
+  try {
+    const response = await getClientIp();
+    if (response.code === 200) {
+      const data = response.data;
+      clientIp.value = data.ip || "未知";
+      isIPv6.value = data.isIPv6 || false;
+      clientLocation.value = data.location || null;
+    } else {
+      clientIp.value = "获取失败";
+      clientLocation.value = null;
+      isIPv6.value = false;
+    }
+  } catch (error) {
+    clientIp.value = "获取失败";
+    clientLocation.value = null;
+    isIPv6.value = false;
+    console.error("获取客户端IP失败:", error);
+  } finally {
+    clientIpLoading.value = false;
+  }
+}
+
 // 在组件挂载后执行查询操作
 onMounted(() => {
   getList();
+  fetchClientIp();
 });
 
 // 在组件卸载前清理资源
@@ -813,4 +922,85 @@ onUnmounted(() => {
   formLoading.value = false;
 });
 </script>
+
+<style scoped>
+.client-ip-card {
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
+  border: 1px solid #e1e8ff;
+}
+
+.client-ip-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  flex-wrap: wrap;
+}
+
+.client-ip-icon {
+  color: #409eff;
+  font-size: 16px;
+}
+
+.client-ip-label {
+  color: #606266;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.location-icon {
+  color: #67c23a;
+  font-size: 14px;
+}
+
+.location-text {
+  color: #606266;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.location-separator {
+  color: #dcdfe6;
+  margin: 0 4px;
+}
+
+.isp-tag {
+  margin-left: 6px;
+  font-size: 12px;
+}
+
+.refresh-ip-btn {
+  margin-left: 8px;
+  color: #909399;
+  padding: 4px 8px;
+  min-height: auto;
+}
+
+.refresh-ip-btn:hover {
+  color: #409eff;
+  background-color: #ecf5ff;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .client-ip-info {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  
+  .client-ip-label {
+    font-size: 13px;
+  }
+  
+  .location-text {
+    font-size: 12px;
+  }
+  
+  .isp-tag {
+    margin-left: 4px;
+    margin-top: 4px;
+  }
+}
+</style>
 

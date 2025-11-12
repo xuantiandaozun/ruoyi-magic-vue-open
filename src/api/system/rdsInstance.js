@@ -83,3 +83,12 @@ export function updateAllRdsClientWhitelist() {
     method: 'post'
   })
 }
+
+// 获取当前客户端IP地址
+export function getClientIp() {
+  return request({
+    url: '/system/rdsInstance/getClientIp',
+    method: 'get',
+    isFullResponse: true
+  })
+}
