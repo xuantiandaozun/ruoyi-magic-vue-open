@@ -42,3 +42,11 @@ export function delSecretKey(id) {
     method: 'delete'
   })
 }
+
+// 获取飞书密钥下拉选项
+export function getFeishuSecretKeyOptions() {
+  return request({
+    url: '/system/secretKey/feishu/options',
+    method: 'get'
+  })
+}
