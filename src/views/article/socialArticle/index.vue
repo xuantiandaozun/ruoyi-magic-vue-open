@@ -115,8 +115,28 @@
         <!-- 卡片头部 -->
         <div class="card-header">
           <div class="card-title">
-            <h3>{{ article.titleZh || '无标题' }}</h3>
-            <p class="english-title">{{ article.titleEn }}</p>
+            <div class="title-row primary">
+              <h3>{{ article.titleZh || '无标题' }}</h3>
+              <el-button
+                v-if="article.titleZh"
+                size="small"
+                type="text"
+                icon="CopyDocument"
+                @click.stop="copyToClipboard(article.titleZh, '中文标题')"
+                title="复制中文标题"
+              />
+            </div>
+            <div class="title-row secondary">
+              <p class="english-title">{{ article.titleEn || '暂无英文标题' }}</p>
+              <el-button
+                v-if="article.titleEn"
+                size="small"
+                type="text"
+                icon="CopyDocument"
+                @click.stop="copyToClipboard(article.titleEn, '英文标题')"
+                title="复制英文标题"
+              />
+            </div>
           </div>
           <div class="card-actions">
             <el-button 
@@ -156,7 +176,7 @@
                      size="small" 
                      type="text" 
                      icon="CopyDocument" 
-                     @click.stop="copyToClipboard(article.summaryZh, '中文摘要')"
+                     @click.stop="copyToClipboard(article.summaryZh, '中文摘要', { rich: true })"
                      title="复制中文摘要"
                    />
                  </div>
@@ -171,7 +191,7 @@
                      size="small" 
                      type="text" 
                      icon="CopyDocument" 
-                     @click.stop="copyToClipboard(article.contentZh, '中文内容')"
+                     @click.stop="copyToClipboard(article.contentZh, '中文内容', { rich: true })"
                      title="复制中文内容"
                    />
                  </div>
@@ -205,7 +225,7 @@
                      size="small" 
                      type="text" 
                      icon="CopyDocument" 
-                     @click.stop="copyToClipboard(article.summaryEn, '英文摘要')"
+                     @click.stop="copyToClipboard(article.summaryEn, '英文摘要', { rich: true })"
                      title="复制英文摘要"
                    />
                  </div>
@@ -220,7 +240,7 @@
                      size="small" 
                      type="text" 
                      icon="CopyDocument" 
-                     @click.stop="copyToClipboard(article.contentEn, '英文内容')"
+                     @click.stop="copyToClipboard(article.contentEn, '英文内容', { rich: true })"
                      title="复制英文内容"
                    />
                  </div>
@@ -350,8 +370,9 @@
 </template>
 
 <script setup name="SocialArticle">
-import { listSocialArticle, getSocialArticle, delSocialArticle, addSocialArticle, updateSocialArticle } from "@/api/article/socialArticle";
-import { onMounted, onUnmounted, getCurrentInstance, ref, reactive, toRefs } from 'vue';
+import { addSocialArticle, delSocialArticle, getSocialArticle, listSocialArticle, updateSocialArticle } from "@/api/article/socialArticle";
+import { marked } from 'marked';
+import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
 // 模板引用
@@ -542,34 +563,125 @@ async function handleBatchDelete() {
   }
 }
 
+// 将 Markdown 渲染为 HTML
+function renderMarkdownToHtml(content) {
+  if (!content) {
+    return '';
+  }
+  try {
+    return marked.parse(content);
+  } catch (error) {
+    return String(content);
+  }
+}
+
+// 尝试以富文本方式复制
+async function tryCopyRichContent(plainText, htmlContent) {
+  if (!plainText || !htmlContent) {
+    return false;
+  }
+
+  const clipboardItemSupported = typeof ClipboardItem === 'function' && navigator.clipboard && navigator.clipboard.write;
+  if (clipboardItemSupported) {
+    try {
+      const item = new ClipboardItem({
+        'text/plain': new Blob([plainText], { type: 'text/plain' }),
+        'text/html': new Blob([htmlContent], { type: 'text/html' })
+      });
+      await navigator.clipboard.write([item]);
+      return true;
+    } catch (error) {
+      // 继续尝试 DOM 选择的降级方案
+    }
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = htmlContent;
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '-9999px';
+  container.style.pointerEvents = 'none';
+  container.style.opacity = '0';
+  document.body.appendChild(container);
+
+  const selection = window.getSelection();
+  if (!selection) {
+    document.body.removeChild(container);
+    return false;
+  }
+
+  selection.removeAllRanges();
+  const range = document.createRange();
+  range.selectNode(container);
+  selection.addRange(range);
+
+  let success = false;
+  try {
+    success = document.execCommand('copy');
+  } catch (error) {
+    success = false;
+  }
+
+  selection.removeAllRanges();
+  document.body.removeChild(container);
+  return success;
+}
+
+// 普通文本复制
+async function copyPlainTextToClipboard(plainText) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(plainText);
+      return true;
+    }
+  } catch (error) {
+    // ignore, fallback to textarea
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = plainText;
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-9999px';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  let success = false;
+  try {
+    success = document.execCommand('copy');
+  } catch (error) {
+    success = false;
+  }
+
+  document.body.removeChild(textArea);
+  return success;
+}
+
 // 复制到剪贴板
-async function copyToClipboard(text, label) {
+async function copyToClipboard(text, label, options = {}) {
   if (!text) {
     proxy.$modal.msgWarning('内容为空，无法复制');
     return;
   }
-  
-  try {
-    await navigator.clipboard.writeText(text);
-    proxy.$modal.msgSuccess(`${label}已复制到剪贴板`);
-  } catch (error) {
-    // 降级方案：使用传统方法
-    const textArea = document.createElement('textarea');
-    textArea.value = text;
-    textArea.style.position = 'fixed';
-    textArea.style.opacity = '0';
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    
-    try {
-      document.execCommand('copy');
-      proxy.$modal.msgSuccess(`${label}已复制到剪贴板`);
-    } catch (fallbackError) {
-      proxy.$modal.msgError('复制失败，请手动复制');
-    }
-    
-    document.body.removeChild(textArea);
+
+  const plainText = String(text);
+  const richCopy = Boolean(options.rich);
+  let copied = false;
+
+  if (richCopy) {
+    const htmlContent = renderMarkdownToHtml(plainText);
+    copied = await tryCopyRichContent(plainText, htmlContent);
+  }
+
+  if (!copied) {
+    copied = await copyPlainTextToClipboard(plainText);
+  }
+
+  if (copied) {
+    proxy.$modal.msgSuccess(`${label || '内容'}已复制到剪贴板`);
+  } else {
+    proxy.$modal.msgError('复制失败，请手动复制');
   }
 }
 
@@ -744,21 +856,49 @@ onUnmounted(() => {
   margin-left: 32px; /* 为选择框留出空间 */
 }
 
-.card-title h3 {
-  margin: 0 0 8px 0;
+.card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title-row h3 {
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
   color: #303133;
   line-height: 1.4;
   word-break: break-word;
+  flex: 1;
 }
 
-.card-title .english-title {
+.title-row .english-title {
   margin: 0;
   font-size: 14px;
   color: #909399;
   line-height: 1.4;
   word-break: break-word;
+  flex: 1;
+}
+
+.title-row .el-button {
+  padding: 2px;
+  min-height: 0;
+  border: none;
+  background: transparent;
+  color: #909399;
+  transition: color 0.3s ease;
+}
+
+.title-row .el-button:hover {
+  color: #409eff;
 }
 
 .card-actions {

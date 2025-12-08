@@ -157,13 +157,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="300">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="360">
         <template #default="scope">
           <el-button link type="primary" icon="Picture" @click="handleSetCover(scope.row)" v-hasPermi="['article:blog:edit']">设置封面</el-button>
+          <el-button link type="success" icon="MagicStick" @click="handleAiCover(scope.row)" v-hasPermi="['article:blog:edit']" :loading="scope.row.aiCoverLoading">AI封面</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['article:blog:edit']">修改</el-button>
           <el-button link type="success" icon="EditPen" @click="handleEditContent(scope.row)" v-hasPermi="['article:blog:edit']">编辑内容</el-button>
           <el-button link type="warning" icon="Search" @click="handleSeoOptimize(scope.row)" v-hasPermi="['article:blog:edit']">SEO优化</el-button>
-
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['article:blog:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -323,8 +323,9 @@
 </template>
 
 <script setup name="Blog">
-import { addBlog, delBlog, generateAiImage, getBlog, getFeishuDocOptions, listBlog, polishBlog, seoBlog, updateBlog } from "@/api/article/blog";
 import { listUnusedRecords } from "@/api/ai/coverGenerationRecord";
+import { generateBlogCover } from "@/api/ai/workflowApi";
+import { addBlog, delBlog, generateAiImage, getBlog, getFeishuDocOptions, listBlog, polishBlog, seoBlog, updateBlog } from "@/api/article/blog";
 import { getEnBlogByZhBlogId, updateEnBlog } from "@/api/article/enBlog";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -807,16 +808,35 @@ async function confirmSetCover() {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
+/** AI生成封面按钮操作 */
+async function handleAiCover(row) {
+  if (!row.blogId) {
+    proxy.$modal.msgError('无效的博客ID');
+    return;
+  }
+  
+  // 设置当前行的loading状态
+  row.aiCoverLoading = true;
+  
+  try {
+    proxy.$modal.msgSuccess('AI封面生成任务已提交，请稍候...');
+    
+    // 调用封装好的API
+    const response = await generateBlogCover(row.blogId);
+    
+    if (response.code === 200) {
+      proxy.$modal.msgSuccess('AI封面生成成功！');
+      // 刷新列表以显示新封面
+      getList();
+    } else {
+      proxy.$modal.msgError(response.msg || 'AI封面生成失败');
+    }
+  } catch (error) {
+    proxy.$modal.msgError('AI封面生成失败：' + (error.message || error));
+  } finally {
+    row.aiCoverLoading = false;
+  }
+}
 
 // 在组件挂载后执行查询操作
 onMounted(() => {
