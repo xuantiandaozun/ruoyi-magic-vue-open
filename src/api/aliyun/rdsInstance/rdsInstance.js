@@ -3,7 +3,7 @@ import request from '@/utils/request'
 // 查询RDS实例管理列表
 export function listRdsInstance(query) {
   return request({
-    url: '/system/rdsInstance/list',
+    url: '/aliyun/rdsInstance/list',
     method: 'get',
     params: query
   })
@@ -12,7 +12,7 @@ export function listRdsInstance(query) {
 // 查询RDS实例管理详细
 export function getRdsInstance(id) {
   return request({
-    url: '/system/rdsInstance/' + id,
+    url: '/aliyun/rdsInstance/' + id,
     method: 'get'
   })
 }
@@ -20,7 +20,7 @@ export function getRdsInstance(id) {
 // 新增RDS实例管理
 export function addRdsInstance(data) {
   return request({
-    url: '/system/rdsInstance',
+    url: '/aliyun/rdsInstance',
     method: 'post',
     data: data
   })
@@ -29,7 +29,7 @@ export function addRdsInstance(data) {
 // 修改RDS实例管理
 export function updateRdsInstance(data) {
   return request({
-    url: '/system/rdsInstance',
+    url: '/aliyun/rdsInstance',
     method: 'put',
     data: data
   })
@@ -38,7 +38,7 @@ export function updateRdsInstance(data) {
 // 删除RDS实例管理
 export function delRdsInstance(id) {
   return request({
-    url: '/system/rdsInstance/' + id,
+    url: '/aliyun/rdsInstance/' + id,
     method: 'delete'
   })
 }
@@ -46,7 +46,7 @@ export function delRdsInstance(id) {
 // 同步阿里云RDS实例
 export function syncAliyunRdsInstances() {
   return request({
-    url: '/system/rdsInstance/syncAliyun',
+    url: '/aliyun/rdsInstance/syncAliyun',
     method: 'post'
   })
 }
@@ -54,7 +54,7 @@ export function syncAliyunRdsInstances() {
 // 获取RDS实例连接信息
 export function getRdsInstanceNetInfo(dbInstanceId) {
   return request({
-    url: '/system/rdsInstance/netInfo/' + dbInstanceId,
+    url: '/aliyun/rdsInstance/netInfo/' + dbInstanceId,
     method: 'get'
   })
 }
@@ -62,7 +62,7 @@ export function getRdsInstanceNetInfo(dbInstanceId) {
 // 获取RDS实例白名单信息
 export function getRdsInstanceIPArrayList(dbInstanceId) {
   return request({
-    url: '/system/rdsInstance/ipArrayList/' + dbInstanceId,
+    url: '/aliyun/rdsInstance/ipArrayList/' + dbInstanceId,
     method: 'get'
   })
 }
@@ -70,7 +70,7 @@ export function getRdsInstanceIPArrayList(dbInstanceId) {
 // 修改RDS实例白名单
 export function modifyRdsInstanceSecurityIps(dbInstanceId, data) {
   return request({
-    url: '/system/rdsInstance/modifySecurityIps/' + dbInstanceId,
+    url: '/aliyun/rdsInstance/modifySecurityIps/' + dbInstanceId,
     method: 'put',
     data: data
   })
@@ -79,7 +79,7 @@ export function modifyRdsInstanceSecurityIps(dbInstanceId, data) {
 // 批量更新所有RDS实例的客户端白名单
 export function updateAllRdsClientWhitelist() {
   return request({
-    url: '/system/rdsInstance/updateClientWhitelist',
+    url: '/aliyun/rdsInstance/updateClientWhitelist',
     method: 'post'
   })
 }
@@ -87,7 +87,7 @@ export function updateAllRdsClientWhitelist() {
 // 获取当前客户端IP地址
 export function getClientIp() {
   return request({
-    url: '/system/rdsInstance/getClientIp',
+    url: '/aliyun/rdsInstance/getClientIp',
     method: 'get',
     isFullResponse: true
   })

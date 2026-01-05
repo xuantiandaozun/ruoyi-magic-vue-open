@@ -125,7 +125,7 @@
           plain
           icon="Plus"
           @click="handleAdd"
-          v-hasPermi="['system:rdsInstance:add']"
+          v-hasPermi="['aliyun:rdsInstance:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -135,7 +135,7 @@
           icon="Edit"
           :disabled="single"
           @click="handleUpdate"
-          v-hasPermi="['system:rdsInstance:edit']"
+          v-hasPermi="['aliyun:rdsInstance:edit']"
         >修改</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -145,7 +145,7 @@
           icon="Delete"
           :disabled="multiple"
           @click="handleDelete"
-          v-hasPermi="['system:rdsInstance:remove']"
+          v-hasPermi="['aliyun:rdsInstance:remove']"
         >删除</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -154,7 +154,7 @@
           plain
           icon="Download"
           @click="handleExport"
-          v-hasPermi="['system:rdsInstance:export']"
+          v-hasPermi="['aliyun:rdsInstance:export']"
         >导出</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -171,7 +171,7 @@
           plain
           icon="Setting"
           @click="handleUpdateAllClientWhitelist"
-          v-hasPermi="['system:rdsInstance:edit']"
+          v-hasPermi="['aliyun:rdsInstance:edit']"
         >批量更新客户端白名单</el-button>
       </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
@@ -194,10 +194,10 @@
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" icon="View" @click="handleViewNetInfo(scope.row)" v-hasPermi="['system:rdsInstance:query']">连接信息</el-button>
-          <el-button link type="success" icon="List" @click="handleViewIPArrayList(scope.row)" v-hasPermi="['system:rdsInstance:query']">白名单</el-button>
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:rdsInstance:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:rdsInstance:remove']">删除</el-button>
+          <el-button link type="primary" icon="View" @click="handleViewNetInfo(scope.row)" v-hasPermi="['aliyun:rdsInstance:query']">连接信息</el-button>
+          <el-button link type="success" icon="List" @click="handleViewIPArrayList(scope.row)" v-hasPermi="['aliyun:rdsInstance:query']">白名单</el-button>
+          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['aliyun:rdsInstance:edit']">修改</el-button>
+          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['aliyun:rdsInstance:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -452,7 +452,7 @@
                   type="primary" 
                   size="small" 
                   @click="handleModifySecurityIps(scope.row)"
-                  v-hasPermi="['system:rdsInstance:edit']"
+                  v-hasPermi="['aliyun:rdsInstance:edit']"
                 >修改</el-button>
               </template>
             </el-table-column>
@@ -512,7 +512,7 @@
 </template>
 
 <script setup name="RdsInstance">
-import { addRdsInstance, delRdsInstance, getRdsInstance, getRdsInstanceNetInfo, getRdsInstanceIPArrayList, modifyRdsInstanceSecurityIps, listRdsInstance, syncAliyunRdsInstances, updateRdsInstance, updateAllRdsClientWhitelist, getClientIp } from "@/api/system/rdsInstance";
+import { addRdsInstance, delRdsInstance, getClientIp, getRdsInstance, getRdsInstanceIPArrayList, getRdsInstanceNetInfo, listRdsInstance, modifyRdsInstanceSecurityIps, syncAliyunRdsInstances, updateAllRdsClientWhitelist, updateRdsInstance } from "@/api/aliyun/rdsInstance/rdsInstance";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
@@ -744,7 +744,7 @@ async function handleDelete(row) {
 
 /** 导出按钮操作 */
 function handleExport() {
-  proxy.download('system/rdsInstance/export', {
+  proxy.download('aliyun/rdsInstance/export', {
     ...queryParams.value
   }, 'rdsInstance_' + new Date().getTime() + '.xlsx')
 }
