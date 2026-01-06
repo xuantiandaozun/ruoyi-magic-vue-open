@@ -1,4 +1,4 @@
-import useUserStore from '@/store/modules/user'
+import useUserStore from '@/store/modules/user';
 
 /**
  * 字符权限校验
@@ -8,8 +8,15 @@ import useUserStore from '@/store/modules/user'
 export function checkPermi(value) {
   if (value && value instanceof Array && value.length > 0) {
     const permissions = useUserStore().permissions
+    const roles = useUserStore().roles
     const permissionDatas = value
     const all_permission = "*:*:*";
+    const super_admin = "admin";
+
+    // 判断是否是 admin 用户，如果是则直接返回 true(超级管理员)
+    if (roles.some(role => role === super_admin)) {
+      return true
+    }
 
     const hasPermission = permissions.some(permission => {
       return all_permission === permission || permissionDatas.includes(permission)

@@ -1,9 +1,9 @@
-import auth from '@/plugins/auth'
-import router, { constantRoutes, dynamicRoutes } from '@/router'
 import { getRouters } from '@/api/menu'
-import Layout from '@/layout/index'
 import ParentView from '@/components/ParentView'
 import InnerLink from '@/layout/components/InnerLink'
+import Layout from '@/layout/index'
+import auth from '@/plugins/auth'
+import router, { constantRoutes, dynamicRoutes } from '@/router'
 
 // 匹配views里面所有的.vue文件
 const modules = import.meta.glob('./../../views/**/*.vue')
@@ -42,7 +42,7 @@ const usePermissionStore = defineStore(
               resolve([])
               return
             }
-            
+
             const sdata = JSON.parse(JSON.stringify(res))
             const rdata = JSON.parse(JSON.stringify(res))
             const defaultData = JSON.parse(JSON.stringify(res))
@@ -50,16 +50,16 @@ const usePermissionStore = defineStore(
             const rewriteRoutes = filterAsyncRouter(rdata, false, true)
             const defaultRoutes = filterAsyncRouter(defaultData)
             const asyncRoutes = filterDynamicRoutes(dynamicRoutes)
-            
+
             // 清除所有动态路由
             let removeRoutes = []
-            asyncRoutes.forEach(route => { 
+            asyncRoutes.forEach(route => {
               if (route && route.path) {
                 const routeObj = router.addRoute(route)
                 removeRoutes.push(routeObj)
               }
             })
-            
+
             this.setRoutes(rewriteRoutes)
             this.setSidebarRouters(constantRoutes.concat(sidebarRoutes))
             this.setDefaultRoutes(sidebarRoutes)
@@ -81,7 +81,7 @@ function filterAsyncRouter(asyncRouterMap, lastRouter = false, type = false) {
     if (!route || !route.path) {
       return false
     }
-    
+
     if (type && route.children) {
       route.children = filterChildren(route.children)
     }
@@ -119,7 +119,7 @@ function filterChildren(childrenMap, lastRouter = false) {
     if (!el || !el.path) {
       return
     }
-    
+
     if (el.children && el.children.length) {
       if (el.component === 'ParentView' && !lastRouter) {
         el.children.forEach(c => {
@@ -150,6 +150,12 @@ function filterChildren(childrenMap, lastRouter = false) {
 // 动态路由遍历，验证是否具备权限
 export function filterDynamicRoutes(routes) {
   const res = []
+
+  // 判断是否是 admin 用户，如果是则直接返回所有路由(超级管理员)
+  if (auth.hasRole('admin')) {
+    return routes
+  }
+
   routes.forEach(route => {
     if (route.permissions) {
       if (auth.hasPermiOr(route.permissions)) {
