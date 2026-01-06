@@ -52,7 +52,7 @@
           plain
           icon="Plus"
           @click="handleAdd"
-          v-hasPermi="['system:secretKey:add']"
+          v-hasPermi="['secretkey:info:add']"
         >新增</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -62,7 +62,7 @@
           icon="Edit"
           :disabled="single"
           @click="handleUpdate"
-          v-hasPermi="['system:secretKey:edit']"
+          v-hasPermi="['secretkey:info:edit']"
         >修改</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -72,7 +72,7 @@
           icon="Delete"
           :disabled="multiple"
           @click="handleDelete"
-          v-hasPermi="['system:secretKey:remove']"
+          v-hasPermi="['secretkey:info:remove']"
         >删除</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -81,7 +81,7 @@
           plain
           icon="Download"
           @click="handleExport"
-          v-hasPermi="['system:secretKey:export']"
+          v-hasPermi="['secretkey:info:export']"
         >导出</el-button>
       </el-col>
       <el-col :span="1.5">
@@ -122,8 +122,8 @@
       </el-table-column>
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
         <template #default="scope">
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:secretKey:edit']">修改</el-button>
-          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['system:secretKey:remove']">删除</el-button>
+          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['secretkey:info:edit']">修改</el-button>
+          <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['secretkey:info:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -251,10 +251,10 @@
   </div>
 </template>
 
-<script setup name="SecretKey">
-import { listSecretKey, getSecretKey, delSecretKey, addSecretKey, updateSecretKey } from "@/api/system/secretKey";
+<script setup name="SecretKeyInfo">
+import { addSecretKey, delSecretKey, getSecretKey, listSecretKey, updateSecretKey } from "@/api/secretkey/info";
 import { syncAliyunRegions } from "@/api/system/aliyunRegion";
-import { onMounted, onUnmounted, getCurrentInstance, ref, reactive, toRefs } from 'vue';
+import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
 // 模板引用
@@ -469,7 +469,7 @@ async function handleDelete(row) {
 
 /** 导出按钮操作 */
 function handleExport() {
-  proxy.download('system/secretKey/export', {
+  proxy.download('secretkey/info/export', {
     ...queryParams.value
   }, 'secretKey_' + new Date().getTime() + '.xlsx')
 }
