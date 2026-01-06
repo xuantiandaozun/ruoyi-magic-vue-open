@@ -142,7 +142,7 @@
 
 <script setup name="FeishuUsers">
 import { addFeishuUsers, delFeishuUsers, getFeishuUsers, listFeishuUsers, updateFeishuUsers } from "@/api/feishu/users";
-import { getFeishuSecretKeyOptions } from "@/api/system/secretKey";
+import { getFeishuSecretKeyOptions } from "@/api/secretkey/info";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
