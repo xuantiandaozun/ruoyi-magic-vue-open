@@ -124,7 +124,7 @@
                 v-for="item in secretKeyOptions"
                 :key="item.id"
                 :label="item.keyName"
-                :value="item.id"
+                :value="String(item.id)"
               />
             </el-select>
           </el-form-item>
@@ -143,7 +143,7 @@
 <script setup name="FeishuUsers">
 import { addFeishuUsers, delFeishuUsers, getFeishuUsers, listFeishuUsers, updateFeishuUsers } from "@/api/feishu/users";
 import { getFeishuSecretKeyOptions } from "@/api/secretkey/info";
-import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
+import { getCurrentInstance, nextTick, onMounted, onUnmounted, reactive, ref, toRefs } from 'vue';
 
 const { proxy } = getCurrentInstance();
 // 模板引用
@@ -275,14 +275,28 @@ async function handleUpdate(row) {
   reset();
   const editId = row.id || ids.value[0];
   formLoading.value = true;
+  open.value = true; // 先打开对话框，避免UI卡顿
+  title.value = "修改飞书用户信息";
+  
   try {
-    await getSecretKeyOptions();
-    const response = await getFeishuUsers(editId);
-    form.value = response;
-    open.value = true;
-    title.value = "修改飞书用户信息";
+    // 并行获取密钥选项和用户信息
+    const [secretKeys, userData] = await Promise.all([
+      getSecretKeyOptions(),
+      getFeishuUsers(editId)
+    ]);
+    
+    // 设置表单数据
+    form.value = { ...userData };
+    
+    // 确保keyId正确设置为数字类型，以便与密钥选项匹配
+    form.value.keyId = userData.keyId != null ? String(userData.keyId) : null;
+    
+    // 触发Vue的响应式更新
+    await nextTick();
+    
   } catch (error) {
     proxy.$modal.msgError("获取数据失败：" + error);
+    open.value = false; // 出错时关闭对话框
   } finally {
     formLoading.value = false;
   }
@@ -300,7 +314,9 @@ async function submitForm() {
   try {
     // 根据选择的keyId设置keyName
     if (form.value.keyId) {
-      const selectedKey = secretKeyOptions.value.find(item => item.id === form.value.keyId);
+      const selectedKey = secretKeyOptions.value.find(
+        item => String(item.id) === String(form.value.keyId)
+      );
       if (selectedKey) {
         form.value.keyName = selectedKey.keyName;
       }
