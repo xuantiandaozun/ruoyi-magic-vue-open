@@ -124,7 +124,7 @@
                 v-for="item in secretKeyOptions"
                 :key="item.id"
                 :label="item.keyName"
-                :value="String(item.id)"
+                :value="item.id"
               />
             </el-select>
           </el-form-item>
@@ -288,8 +288,8 @@ async function handleUpdate(row) {
     // 设置表单数据
     form.value = { ...userData };
     
-    // 确保keyId正确设置为数字类型，以便与密钥选项匹配
-    form.value.keyId = userData.keyId != null ? String(userData.keyId) : null;
+    // keyId直接使用原始值（数字类型），与el-option的value类型保持一致
+    form.value.keyId = userData.keyId;
     
     // 触发Vue的响应式更新
     await nextTick();
@@ -315,7 +315,7 @@ async function submitForm() {
     // 根据选择的keyId设置keyName
     if (form.value.keyId) {
       const selectedKey = secretKeyOptions.value.find(
-        item => String(item.id) === String(form.value.keyId)
+        item => item.id === form.value.keyId
       );
       if (selectedKey) {
         form.value.keyName = selectedKey.keyName;
