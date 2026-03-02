@@ -89,16 +89,10 @@ export const constantRoutes = [
   {
     path: '/ai',
     component: Layout,
-    redirect: '/ai/chat',
+    redirect: '/ai/image',
     name: 'Ai',
-    meta: { title: 'AI助手', icon: 'robot' },
+    meta: { title: 'AI 助手', icon: 'robot' },
     children: [
-      {
-        path: 'chat',
-        component: () => import('@/views/ai/chat'),
-        name: 'AiChat',
-        meta: { title: 'AI对话', icon: 'chat', noCache: true }
-      },
       {
         path: 'image',
         component: () => import('@/views/ai/image'),
