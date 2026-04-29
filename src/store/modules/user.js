@@ -24,7 +24,7 @@ const useUserStore = defineStore(
         return new Promise((resolve, reject) => {
           login(username, password, code, uuid).then(res => {
             console.log(res)
-            setToken(res.token)
+            setToken(res.token, !!userInfo.rememberMe)
             this.token = res.token
             resolve()
           }).catch(error => {

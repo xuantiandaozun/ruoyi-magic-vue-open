@@ -27,50 +27,12 @@
     </el-form>
 
     <el-row :gutter="10" class="mb8">
-      <el-col :span="1.5">
-        <el-button
-          type="primary"
-          plain
-          icon="Plus"
-          @click="handleAdd"
-          v-hasPermi="['ai:workflow:add']"
-        >新增</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
-          icon="Edit"
-          :disabled="single"
-          @click="handleUpdate"
-          v-hasPermi="['ai:workflow:edit']"
-        >修改</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="danger"
-          plain
-          icon="Delete"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['ai:workflow:remove']"
-        >删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="Download"
-          @click="handleExport"
-          v-hasPermi="['ai:workflow:export']"
-        >导出</el-button>
-      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="workflowList" @selection-change="handleSelectionChange">
-      <el-table-column type="selection" width="55" align="center" />
+    <el-table v-loading="loading" :data="workflowList">
       <el-table-column label="工作流ID" align="center" prop="id" width="80" />
+      <el-table-column label="工作流Key" align="center" prop="workflowKey" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="工作流名称" align="center" prop="name" :show-overflow-tooltip="true" />
       <el-table-column label="描述" align="center" prop="description" :show-overflow-tooltip="true" />
       <el-table-column label="类型" align="center" prop="type">
@@ -82,13 +44,9 @@
       <el-table-column label="版本" align="center" prop="version" width="80" />
       <el-table-column label="启用状态" align="center" prop="enabled" width="100">
         <template #default="scope">
-          <el-switch
-            v-model="scope.row.enabled"
-            active-value="1"
-            inactive-value="0"
-            @change="handleStatusChange(scope.row)"
-            v-hasPermi="['ai:workflow:edit']"
-          />
+          <el-tag :type="scope.row.enabled === '1' ? 'success' : 'danger'">
+            {{ scope.row.enabled === '1' ? '启用' : '禁用' }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="80">
@@ -96,18 +54,17 @@
           <dict-tag :options="sys_normal_disable" :value="scope.row.status"/>
         </template>
       </el-table-column>
+      <el-table-column label="步骤数" align="center" prop="stepCount" width="80" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
           <span>{{ parseTime(scope.row.createTime, '{y}-{m}-{d} {h}:{i}:{s}') }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="280">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="240">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)" v-hasPermi="['ai:workflow:query']">详情</el-button>
-          <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['ai:workflow:edit']">修改</el-button>
-          <el-button link type="primary" icon="Setting" @click="handleSteps(scope.row)" v-hasPermi="['ai:workflow:list']">步骤</el-button>
           <el-button link type="warning" icon="Timer" @click="handleSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:list']">定时</el-button>
-          <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['ai:workflow:remove']">删除</el-button>
+          <el-button link type="info" icon="Document" @click="handleWorkflowLogs(scope.row)" v-hasPermi="['ai:workflow:schedule:log:list']">日志</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -165,6 +122,7 @@
     <el-dialog title="工作流详情" v-model="detailOpen" width="800px" append-to-body>
       <el-descriptions :column="2" border>
         <el-descriptions-item label="工作流ID">{{ detailForm.id }}</el-descriptions-item>
+        <el-descriptions-item label="工作流Key">{{ detailForm.workflowKey }}</el-descriptions-item>
         <el-descriptions-item label="工作流名称">{{ detailForm.name }}</el-descriptions-item>
         <el-descriptions-item label="工作流类型">
           <el-tag v-if="detailForm.type === 'sequential'" type="primary">顺序工作流</el-tag>
@@ -181,11 +139,18 @@
         </el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ parseTime(detailForm.createTime) }}</el-descriptions-item>
         <el-descriptions-item label="更新时间">{{ parseTime(detailForm.updateTime) }}</el-descriptions-item>
+        <el-descriptions-item label="步骤数">{{ detailForm.stepCount }}</el-descriptions-item>
         <el-descriptions-item label="描述" :span="2">{{ detailForm.description }}</el-descriptions-item>
-        <el-descriptions-item label="配置JSON" :span="2" v-if="detailForm.configJson">
-          <pre style="white-space: pre-wrap; word-break: break-all;">{{ detailForm.configJson }}</pre>
+        <el-descriptions-item label="关联旧ID" :span="2" v-if="detailForm.legacyWorkflowIds">
+          {{ detailForm.legacyWorkflowIds.join(', ') }}
         </el-descriptions-item>
       </el-descriptions>
+      <el-table v-if="detailForm.steps && detailForm.steps.length" :data="detailForm.steps" border class="mt20">
+        <el-table-column label="顺序" prop="order" width="80" align="center" />
+        <el-table-column label="步骤ID" prop="id" width="180" :show-overflow-tooltip="true" />
+        <el-table-column label="步骤名称" prop="name" :show-overflow-tooltip="true" />
+        <el-table-column label="输出变量" prop="output" width="160" :show-overflow-tooltip="true" />
+      </el-table>
     </el-dialog>
 
     <!-- 定时任务管理对话框 -->
@@ -610,6 +575,14 @@ function handleDetail(row) {
   });
 }
 
+/** 查看工作流执行日志 */
+function handleWorkflowLogs(row) {
+  proxy.$router.push({
+    path: '/ai/workflow-schedule-log',
+    query: { workflowId: row.id }
+  });
+}
+
 /** 步骤管理按钮操作 */
 function handleSteps(row) {
   proxy.$router.push({
@@ -792,17 +765,19 @@ function closeScheduleDialog() {
 
 /** 查看执行日志 */
 function handleViewLogs() {
+  const workflowId = currentWorkflow.value.id;
   // 先关闭定时任务管理弹窗
   closeScheduleDialog();
   // 然后跳转到日志页面
   proxy.$router.push({ 
     path: '/ai/workflow-schedule-log', 
-    query: { workflowId: currentWorkflow.value.id } 
+    query: { workflowId } 
   });
 }
 
 /** 查看特定调度任务的日志 */
 function handleViewScheduleLogs(row) {
+  const workflowId = currentWorkflow.value.id;
   // 先关闭定时任务管理弹窗
   closeScheduleDialog();
   // 然后跳转到日志页面
@@ -810,7 +785,7 @@ function handleViewScheduleLogs(row) {
     path: '/ai/workflow-schedule-log', 
     query: { 
       scheduleId: row.id,
-      workflowId: currentWorkflow.value.id 
+      workflowId
     } 
   });
 }

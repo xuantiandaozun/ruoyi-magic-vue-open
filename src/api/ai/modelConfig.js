@@ -50,3 +50,11 @@ export function setDefaultModelConfig(id) {
     method: 'put'
   })
 }
+
+// 获取可用聊天模型
+export function getAvailableChatModels() {
+  return request({
+    url: '/ai/modelConfig/chat/available',
+    method: 'get'
+  })
+}

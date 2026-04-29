@@ -66,31 +66,11 @@
         <el-button
           type="success"
           plain
-          icon="Magic"
-          @click="handleAiPolish"
-          v-hasPermi="['article:blog:add']"
-        >AI润色博客</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="success"
-          plain
           icon="Picture"
           @click="handleAutoImage"
           v-hasPermi="['article:blog:add']"
         >自动配图</el-button>
       </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="Search"
-          :disabled="single"
-          @click="handleSeoOptimize"
-          v-hasPermi="['article:blog:edit']"
-        >SEO优化</el-button>
-      </el-col>
-
       <el-col :span="1.5">
         <el-button
           type="success"
@@ -163,7 +143,6 @@
           <el-button link type="success" icon="MagicStick" @click="handleAiCover(scope.row)" v-hasPermi="['article:blog:edit']" :loading="scope.row.aiCoverLoading">AI封面</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['article:blog:edit']">修改</el-button>
           <el-button link type="success" icon="EditPen" @click="handleEditContent(scope.row)" v-hasPermi="['article:blog:edit']">编辑内容</el-button>
-          <el-button link type="warning" icon="Search" @click="handleSeoOptimize(scope.row)" v-hasPermi="['article:blog:edit']">SEO优化</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['article:blog:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -239,28 +218,6 @@
       </template>
     </el-dialog>
 
-    <!-- AI润色博客对话框 -->
-    <el-dialog title="AI润色博客" v-model="aiPolishOpen" width="80%" :style="{maxWidth: '1200px'}" append-to-body>
-      <el-form ref="aiPolishRef" :model="aiPolishForm" :rules="aiPolishRules" label-width="100px">
-        <el-form-item label="原始内容" prop="content">
-          <el-input
-            v-model="aiPolishForm.content"
-            type="textarea"
-            placeholder="请输入原始内容，支持文档、技术框架用法、脚本代码等各种类型内容"
-            :rows="20"
-            maxlength="30000"
-            show-word-limit
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="cancelAiPolish">取 消</el-button>
-          <el-button type="primary" @click="submitAiPolish" :loading="aiPolishLoading">提交润色</el-button>
-        </div>
-      </template>
-    </el-dialog>
-
     <!-- 设置封面对话框 -->
     <el-dialog 
       v-model="setCoverOpen" 
@@ -325,7 +282,7 @@
 <script setup name="Blog">
 import { listUnusedRecords } from "@/api/ai/coverGenerationRecord";
 import { generateBlogCover } from "@/api/ai/workflowApi";
-import { addBlog, delBlog, generateAiImage, getBlog, getFeishuDocOptions, listBlog, polishBlog, seoBlog, updateBlog } from "@/api/article/blog";
+import { addBlog, delBlog, generateAiImage, getBlog, getFeishuDocOptions, listBlog, updateBlog } from "@/api/article/blog";
 import { getEnBlogByZhBlogId, updateEnBlog } from "@/api/article/enBlog";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -350,23 +307,6 @@ const multiple = ref(true);
 const total = ref(0);
 const title = ref("");
 const daterangePublishTime = ref([]);
-
-// AI润色相关数据
-const aiPolishOpen = ref(false);
-const aiPolishLoading = ref(false);
-const aiPolishRef = ref();
-const aiPolishForm = ref({
-  content: ''
-});
-const aiPolishRules = ref({
-  content: [
-    { required: true, message: "原始内容不能为空", trigger: "blur" },
-    { min: 10, message: "内容长度至少10个字符", trigger: "blur" }
-  ]
-});
-
-// SEO优化相关数据
-const seoOptimizeLoading = ref(false);
 
 // 设置封面相关数据
 const setCoverOpen = ref(false);
@@ -625,73 +565,6 @@ async function handleAutoImage() {
   }
 }
 
-/** AI润色博客按钮操作 */
-function handleAiPolish() {
-  aiPolishForm.value.content = '';
-  aiPolishOpen.value = true;
-}
-
-/** 取消AI润色 */
-function cancelAiPolish() {
-  aiPolishOpen.value = false;
-  aiPolishForm.value.content = '';
-  if (aiPolishRef.value) {
-    aiPolishRef.value.resetFields();
-  }
-}
-
-/** 提交AI润色 */
-async function submitAiPolish() {
-  try {
-    await aiPolishRef.value.validate();
-  } catch (error) {
-    return;
-  }
-
-  aiPolishLoading.value = true;
-  try {
-    const response = await polishBlog({
-      content: aiPolishForm.value.content
-    });
-    
-    if (response.success) {
-      proxy.$modal.msgSuccess(response.message || 'AI润色任务已开始处理，博客将在后台生成');
-      aiPolishOpen.value = false;
-      aiPolishForm.value.content = '';
-      // 刷新列表以显示可能的新博客
-      setTimeout(() => {
-        getList();
-      }, 2000);
-    } else {
-      proxy.$modal.msgError(response.message || 'AI润色失败');
-    }
-  } catch (error) {
-    proxy.$modal.msgError('AI润色失败：' + (error.message || error));
-  } finally {
-    aiPolishLoading.value = false;
-  }
-}
-
-/** SEO优化按钮操作 */
-async function handleSeoOptimize(row) {
-  const blogId = row ? row.blogId : ids.value[0];
-  if (!blogId) {
-    proxy.$modal.msgError('请选择要优化的博客');
-    return;
-  }
-
-  seoOptimizeLoading.value = true;
-  try {
-    const response = await seoBlog({ blogId });
-    proxy.$modal.msgSuccess('SEO优化完成，博客内容已自动更新');
-    getList(); // 刷新列表
-  } catch (error) {
-    proxy.$modal.msgError('SEO优化失败：' + (error.message || error));
-  } finally {
-    seoOptimizeLoading.value = false;
-  }
-}
-
 /** 打开设置封面对话框 */
 async function handleSetCover(item) {
   currentBlogItem.value = item;
@@ -825,9 +698,7 @@ async function handleAiCover(row) {
     const response = await generateBlogCover(row.blogId);
     
     if (response.code === 200) {
-      proxy.$modal.msgSuccess('AI封面生成成功！');
-      // 刷新列表以显示新封面
-      getList();
+      proxy.$modal.msgSuccess(response.msg || 'AI封面生成任务已提交，后台生成完成后会自动更新封面');
     } else {
       proxy.$modal.msgError(response.msg || 'AI封面生成失败');
     }
@@ -964,4 +835,3 @@ onUnmounted(() => {
   }
 }
 </style>
-

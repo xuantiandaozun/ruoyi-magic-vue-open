@@ -51,37 +51,10 @@ export function getFeishuDocOptions() {
   })
 }
 
-// AI润色博客内容
-export function polishBlog(data) {
-  return request({
-    url: '/magic/admin/blog/polish',
-    method: 'post',
-    data: data
-  })
-}
-
 // 自动配图
 export function generateAiImage() {
   return request({
     url: '/article/blog/autoAssignCovers',
     method: 'post'
-  })
-}
-
-// SEO优化博客
-export function seoBlog(data) {
-  return request({
-    url: '/magic/admin/blog/SEOBlog',
-    method: 'post',
-    data: data
-  })
-}
-
-// 更新博客CSDN同步信息
-export function updateCsdnInfo(blogId, csdnInfo) {
-  return request({
-    url: '/article/blog/updateCsdnInfo/' + blogId,
-    method: 'post',
-    data: csdnInfo
   })
 }

@@ -43,15 +43,6 @@ export function delEnBlog(blogId) {
   })
 }
 
-// 英文博客SEO优化
-export function seoEnBlog(data) {
-  return request({
-    url: '/magic/admin/blog/SEOBlogEn',
-    method: 'post',
-    data: data
-  })
-}
-
 // 根据中文博客ID查询对应的英文博客
 export function getEnBlogByZhBlogId(zhBlogId) {
   return request({

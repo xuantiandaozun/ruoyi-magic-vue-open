@@ -404,8 +404,7 @@
 <script setup name="AiWorkflowStep">
 import { listWorkflowSteps, listStepsByWorkflowId, getWorkflowStep, delWorkflowStep, addWorkflowStep, updateWorkflowStep, toggleWorkflowStepStatus, validatePromptVariables } from "@/api/ai/workflowStep";
 import { getWorkflow } from "@/api/ai/workflow";
-import { listModelConfigs } from "@/api/ai/modelConfig";
-import { getAvailableChatModels } from "@/api/ai/chat";
+import { getAvailableChatModels } from "@/api/ai/modelConfig";
 
 const { proxy } = getCurrentInstance();
 const { sys_normal_disable } = proxy.useDict('sys_normal_disable');
@@ -500,11 +499,18 @@ function loadWorkflowInfo() {
 /** 加载模型配置列表 */
 function loadModelConfigs() {
   getAvailableChatModels().then(response => {
-    if (response.code === 200 && response.data) {
-      modelConfigList.value = response.data;
+    if (Array.isArray(response)) {
+      modelConfigList.value = response;
+      return;
     }
+    if (response && Array.isArray(response.data)) {
+      modelConfigList.value = response.data;
+      return;
+    }
+    modelConfigList.value = [];
   }).catch(error => {
     console.error('加载聊天模型失败:', error);
+    modelConfigList.value = [];
   });
 }
 

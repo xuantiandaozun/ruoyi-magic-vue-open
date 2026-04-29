@@ -40,17 +40,6 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button
-          type="warning"
-          plain
-          icon="Search"
-          :disabled="single"
-          :loading="seoOptimizeLoading"
-          @click="handleSeoOptimize"
-          v-hasPermi="['article:enBlog:edit']"
-        >英文SEO优化</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
           type="danger"
           plain
           icon="Delete"
@@ -104,7 +93,6 @@
       <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="250">
         <template #default="scope">
           <el-button link type="primary" icon="Picture" @click="handleSetCover(scope.row)" v-hasPermi="['article:enBlog:edit']">设置封面</el-button>
-          <el-button link type="warning" icon="Search" @click="handleSeoOptimize(scope.row)" v-hasPermi="['article:enBlog:edit']">英文SEO优化</el-button>
           <el-button
             link
             type="primary"
@@ -186,7 +174,7 @@
 </template>
 
 <script setup name="EnBlog">
-import { listEnBlog, delEnBlog, seoEnBlog, updateEnBlog } from "@/api/article/enBlog";
+import { listEnBlog, delEnBlog, updateEnBlog } from "@/api/article/enBlog";
 import { listUnusedRecords } from "@/api/ai/coverGenerationRecord";
 import { onMounted, onUnmounted, getCurrentInstance, ref, reactive, toRefs, watch } from 'vue';
 
@@ -202,9 +190,6 @@ const daterangePublishTime = ref([]);
 const ids = ref([]);
 const single = ref(true);
 const multiple = ref(true);
-
-// SEO优化相关数据
-const seoOptimizeLoading = ref(false);
 
 // 设置封面相关数据
 const setCoverOpen = ref(false);
@@ -294,26 +279,6 @@ function handleExport() {
   proxy.download('article/enBlog/export', {
     ...queryParams.value
   }, 'enBlog_' + new Date().getTime() + '.xlsx')
-}
-
-/** 英文SEO优化按钮操作 */
-async function handleSeoOptimize(row) {
-  const blogId = row ? row.blogId : ids.value[0];
-  if (!blogId) {
-    proxy.$modal.msgError('请选择要优化的英文博客');
-    return;
-  }
-
-  seoOptimizeLoading.value = true;
-  try {
-    const response = await seoEnBlog({ blogId });
-    proxy.$modal.msgSuccess('英文SEO优化完成，博客内容已自动更新');
-    getList(); // 刷新列表
-  } catch (error) {
-    proxy.$modal.msgError('英文SEO优化失败：' + (error.message || error));
-  } finally {
-    seoOptimizeLoading.value = false;
-  }
 }
 
 /** 打开设置封面对话框 */
@@ -420,7 +385,6 @@ onMounted(() => {
 onUnmounted(() => {
   // 确保所有加载状态被重置，防止内存泄漏
   loading.value = false;
-  seoOptimizeLoading.value = false;
   setCoverLoading.value = false;
 });
 </script>
