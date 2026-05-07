@@ -51,6 +51,14 @@ export function setDefaultModelConfig(id) {
   })
 }
 
+// 同步 OpenRouter 免费模型
+export function syncOpenRouterFreeModels() {
+  return request({
+    url: '/ai/modelConfig/syncOpenRouterFree',
+    method: 'put'
+  })
+}
+
 // 获取可用聊天模型
 export function getAvailableChatModels() {
   return request({

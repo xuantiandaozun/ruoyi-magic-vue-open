@@ -86,59 +86,6 @@ export const constantRoutes = [
     hidden: true,
     meta: { title: '飞书授权回调' }
   },
-  {
-    path: '/ai',
-    component: Layout,
-    redirect: '/ai/image',
-    name: 'Ai',
-    meta: { title: 'AI 助手', icon: 'robot' },
-    children: [
-      {
-        path: 'image',
-        component: () => import('@/views/ai/image'),
-        name: 'AiImage',
-        meta: { title: 'AI生图', icon: 'picture', noCache: true }
-      },
-      {
-        path: 'modelConfig',
-        component: () => import('@/views/ai/modelConfig'),
-        name: 'AiModelConfig',
-        meta: { title: '模型配置', icon: 'setting', noCache: false }
-      },
-      {
-        path: 'workflow',
-        component: () => import('@/views/ai/workflow'),
-        name: 'AiWorkflow',
-        meta: { title: '工作流管理', icon: 'workflow', noCache: false }
-      },
-      {
-        path: 'workflowStep',
-        component: () => import('@/views/ai/workflowStep'),
-        name: 'AiWorkflowStep',
-        hidden: true,
-        meta: { title: '工作流步骤', activeMenu: '/ai/workflow', noCache: false }
-      },
-      {
-        path: 'workflow-schedule-log',
-        component: () => import('@/views/ai/workflowScheduleLog'),
-        name: 'AiWorkflowScheduleLog',
-        hidden: true,
-        meta: { title: '定时任务日志', activeMenu: '/ai/workflow', noCache: false }
-      },
-      {
-        path: 'blogProductionRecord',
-        component: () => import('@/views/ai/blogProductionRecord'),
-        name: 'BlogProductionRecord',
-        meta: { title: 'AI博客生产', noCache: false }
-      },
-      {
-        path: 'coverGenerationRecord',
-        component: () => import('@/views/ai/coverGenerationRecord'),
-        name: 'CoverGenerationRecord',
-        meta: { title: 'AI生图记录', noCache: false }
-      }
-    ]
-  }
 ]
 
 // 动态路由，基于用户权限动态去加载
@@ -252,6 +199,34 @@ export const dynamicRoutes = [
         component: () => import('@/views/article/blog/editor'),
         name: 'BlogEditor',
         meta: { title: '博客内容编辑', activeMenu: '/article/blog', noCache: true }
+      }
+    ]
+  },
+  {
+    path: '/aiManage/workflowStep',
+    component: Layout,
+    hidden: true,
+    permissions: ['ai:workflow:list'],
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/ai/workflowStep'),
+        name: 'AiWorkflowStep',
+        meta: { title: '工作流步骤', activeMenu: '/aiManage/workflow', noCache: false }
+      }
+    ]
+  },
+  {
+    path: '/aiManage/workflow-schedule-log',
+    component: Layout,
+    hidden: true,
+    permissions: ['ai:workflow:list'],
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/ai/workflowScheduleLog'),
+        name: 'AiWorkflowScheduleLog',
+        meta: { title: '定时任务日志', activeMenu: '/aiManage/workflow', noCache: false }
       }
     ]
   }

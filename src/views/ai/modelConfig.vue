@@ -70,6 +70,16 @@
           v-hasPermi="['ai:modelConfig:remove']"
         >删除</el-button>
       </el-col>
+      <el-col :span="1.5">
+        <el-button
+          type="warning"
+          plain
+          icon="Refresh"
+          :loading="syncing"
+          @click="handleSyncOpenRouter"
+          v-hasPermi="['ai:modelConfig:config']"
+        >同步免费模型</el-button>
+      </el-col>
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
@@ -175,13 +185,14 @@
 <script setup name="ModelConfig">
 import { ref, reactive, toRefs, getCurrentInstance } from "vue";
 import { parseTime } from "@/utils/ruoyi";
-import { listModelConfigs, getModelConfig, delModelConfig, addModelConfig, updateModelConfig, setDefaultModelConfig } from "@/api/ai/modelConfig";
+import { listModelConfigs, getModelConfig, delModelConfig, addModelConfig, updateModelConfig, setDefaultModelConfig, syncOpenRouterFreeModels } from "@/api/ai/modelConfig";
 
 const { proxy } = getCurrentInstance();
 
 const modelConfigList = ref([]);
 const open = ref(false);
 const loading = ref(true);
+const syncing = ref(false);
 const showSearch = ref(true);
 const ids = ref([]);
 const single = ref(true);
@@ -352,6 +363,24 @@ function handleSetDefault(row) {
     getList();
     proxy.$modal.msgSuccess("设置成功");
   }).catch(() => {});
+}
+
+/** 手动同步 OpenRouter 免费模型 */
+function handleSyncOpenRouter() {
+  proxy.$modal.confirm('是否立即同步 OpenRouter 免费模型池？请先在系统参数中维护 ai.openrouter.apiKey。').then(function() {
+    syncing.value = true;
+    return syncOpenRouterFreeModels();
+  }).then((response) => {
+    const data = response.data || response;
+    const message = data.skipped
+      ? `已跳过同步，模型总数未变化：${data.remoteCount}`
+      : `同步完成，免费模型 ${data.freeTotal} 个，新增 ${data.inserted}，更新 ${data.updated}，停用 ${data.disabled}`;
+    proxy.$modal.msgSuccess(message);
+    getList();
+  }).catch(() => {
+  }).finally(() => {
+    syncing.value = false;
+  });
 }
 
 getList();

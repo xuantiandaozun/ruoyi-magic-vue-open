@@ -694,7 +694,7 @@ function getToolDescription(toolType) {
 
 /** 返回工作流列表 */
 function goBack() {
-  router.push('/ai/workflow');
+  router.push('/aiManage/workflow');
 }
 
 /** 验证用户提示词中的变量 */

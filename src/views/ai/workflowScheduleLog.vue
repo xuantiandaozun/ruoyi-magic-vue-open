@@ -1,14 +1,6 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="68px">
-      <el-form-item label="调度ID" prop="scheduleId">
-        <el-input
-          v-model="queryParams.scheduleId"
-          placeholder="请输入调度ID"
-          clearable
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
       <el-form-item label="工作流ID" prop="workflowId">
         <el-input
           v-model="queryParams.workflowId"
@@ -51,25 +43,6 @@
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button
-          type="danger"
-          plain
-          icon="Delete"
-          :disabled="multiple"
-          @click="handleDelete"
-          v-hasPermi="['ai:workflow:schedule:log:remove']"
-        >删除</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
-          type="warning"
-          plain
-          icon="Delete"
-          @click="handleCleanExpired"
-          v-hasPermi="['ai:workflow:schedule:log:remove']"
-        >清理过期日志</el-button>
-      </el-col>
-      <el-col :span="1.5">
-        <el-button
           type="info"
           plain
           icon="TrendCharts"
@@ -79,11 +52,10 @@
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList"></right-toolbar>
     </el-row>
 
-    <el-table v-loading="loading" :data="logList" @selection-change="handleSelectionChange" border>
-      <el-table-column type="selection" width="55" align="center" />
+    <el-table v-loading="loading" :data="logList" border>
       <el-table-column label="日志ID" prop="id" width="80" />
-      <el-table-column label="调度名称" prop="scheduleName" />
-      <el-table-column label="工作流名称" prop="workflowName" />
+      <el-table-column label="工作流Key" prop="workflowKey" />
+      <el-table-column label="工作流ID" prop="workflowId" width="100" />
       <el-table-column label="执行状态" align="center" width="100">
         <template #default="scope">
           <el-tag v-if="scope.row.status === 'completed'" type="success">已完成</el-tag>
@@ -101,25 +73,24 @@
           <el-tag v-else type="info">{{ scope.row.triggerType }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="开始时间" prop="actualStartTime" width="180">
+      <el-table-column label="开始时间" prop="startTime" width="180">
         <template #default="scope">
-          {{ parseTime(scope.row.actualStartTime) }}
+          {{ parseTime(scope.row.startTime) }}
         </template>
       </el-table-column>
-      <el-table-column label="结束时间" prop="actualEndTime" width="180">
+      <el-table-column label="结束时间" prop="endTime" width="180">
         <template #default="scope">
-          {{ parseTime(scope.row.actualEndTime) }}
+          {{ parseTime(scope.row.endTime) }}
         </template>
       </el-table-column>
       <el-table-column label="执行时长" align="center" width="100">
         <template #default="scope">
-          {{ scope.row.executionDuration ? scope.row.executionDuration + 'ms' : '-' }}
+          {{ scope.row.durationMs ? scope.row.durationMs + 'ms' : '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="150">
+      <el-table-column label="操作" align="center" width="80">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)" v-hasPermi="['ai:workflow:schedule:log:query']">详情</el-button>
-          <el-button link type="danger" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['ai:workflow:schedule:log:remove']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -136,10 +107,8 @@
     <el-dialog title="执行日志详情" v-model="detailOpen" width="800px" append-to-body>
       <el-descriptions :column="2" border>
         <el-descriptions-item label="日志ID">{{ detailForm.id }}</el-descriptions-item>
-        <el-descriptions-item label="调度ID">{{ detailForm.scheduleId }}</el-descriptions-item>
-        <el-descriptions-item label="调度名称">{{ detailForm.scheduleName }}</el-descriptions-item>
+        <el-descriptions-item label="工作流Key">{{ detailForm.workflowKey }}</el-descriptions-item>
         <el-descriptions-item label="工作流ID">{{ detailForm.workflowId }}</el-descriptions-item>
-        <el-descriptions-item label="工作流名称">{{ detailForm.workflowName }}</el-descriptions-item>
         <el-descriptions-item label="执行状态">
           <el-tag v-if="detailForm.status === 'completed'" type="success">已完成</el-tag>
           <el-tag v-else-if="detailForm.status === 'failed'" type="danger">失败</el-tag>
@@ -153,9 +122,9 @@
           <el-tag v-else-if="detailForm.triggerType === 'manual'" type="warning">手动触发</el-tag>
           <el-tag v-else type="info">{{ detailForm.triggerType }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="开始时间">{{ parseTime(detailForm.actualStartTime) }}</el-descriptions-item>
-        <el-descriptions-item label="结束时间">{{ parseTime(detailForm.actualEndTime) }}</el-descriptions-item>
-        <el-descriptions-item label="执行时长">{{ detailForm.executionDuration ? detailForm.executionDuration + 'ms' : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="开始时间">{{ parseTime(detailForm.startTime) }}</el-descriptions-item>
+        <el-descriptions-item label="结束时间">{{ parseTime(detailForm.endTime) }}</el-descriptions-item>
+        <el-descriptions-item label="执行时长">{{ detailForm.durationMs ? detailForm.durationMs + 'ms' : '-' }}</el-descriptions-item>
         <el-descriptions-item label="输入数据" :span="2" v-if="detailForm.inputData">
           <pre style="white-space: pre-wrap; word-break: break-all;">{{ detailForm.inputData }}</pre>
         </el-descriptions-item>
@@ -237,24 +206,6 @@
         </div>
       </template>
     </el-dialog>
-
-    <!-- 清理过期日志对话框 -->
-    <el-dialog title="清理过期日志" v-model="cleanOpen" width="400px" append-to-body>
-      <el-form :model="cleanForm" label-width="100px">
-        <el-form-item label="保留天数" prop="days">
-          <el-input-number v-model="cleanForm.days" :min="1" :max="365" />
-          <div class="form-tip">
-            <small>将删除指定天数之前的所有日志</small>
-          </div>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button type="danger" @click="confirmCleanExpired">确认清理</el-button>
-          <el-button @click="cleanOpen = false">取 消</el-button>
-        </div>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -303,19 +254,15 @@
 </style>
 
 <script setup name="WorkflowScheduleLog">
-import { listScheduleLogs, getScheduleLog, delScheduleLog, cleanExpiredLogs, getLogStatistics } from "@/api/ai/workflowScheduleLog";
+import { listScheduleLogs, getLogStatistics } from "@/api/ai/workflowScheduleLog";
 
 const { proxy } = getCurrentInstance();
 
 const logList = ref([]);
 const detailOpen = ref(false);
 const statisticsOpen = ref(false);
-const cleanOpen = ref(false);
 const loading = ref(true);
 const showSearch = ref(true);
-const ids = ref([]);
-const single = ref(true);
-const multiple = ref(true);
 const total = ref(0);
 const dateRange = ref([]);
 const statisticsDateRange = ref([]);
@@ -324,7 +271,6 @@ const data = reactive({
   queryParams: {
     pageNum: 1,
     pageSize: 10,
-    scheduleId: null,
     workflowId: null,
     status: null,
     triggerType: null,
@@ -333,17 +279,13 @@ const data = reactive({
   },
   detailForm: {},
   statisticsForm: {
-    scheduleId: null,
     workflowId: null,
     startTime: null,
     endTime: null
   },
-  cleanForm: {
-    days: 30
-  }
 });
 
-const { queryParams, detailForm, statisticsForm, cleanForm } = toRefs(data);
+const { queryParams, detailForm, statisticsForm } = toRefs(data);
 
 const statisticsData = ref({});
 
@@ -358,6 +300,13 @@ function getList() {
     queryParams.value.endTime = null;
   }
   
+  if (!queryParams.value.workflowId) {
+    logList.value = [];
+    total.value = 0;
+    loading.value = false;
+    return;
+  }
+
   listScheduleLogs(queryParams.value).then(response => {
     logList.value = response.rows;
     total.value = response.total;
@@ -378,47 +327,10 @@ function resetQuery() {
   handleQuery();
 }
 
-/** 多选框选中数据 */
-function handleSelectionChange(selection) {
-  ids.value = selection.map(item => item.id);
-  single.value = selection.length != 1;
-  multiple.value = !selection.length;
-}
-
 /** 详情按钮操作 */
 function handleDetail(row) {
-  const logId = row.id || ids.value[0];
-  getScheduleLog(logId).then(response => {
-    detailForm.value = response;
-    detailOpen.value = true;
-  });
-}
-
-/** 删除按钮操作 */
-function handleDelete(row) {
-  const logIds = row.id ? [row.id] : ids.value;
-  proxy.$modal.confirm('是否确认删除选中的执行日志？').then(function() {
-    return delScheduleLog(logIds);
-  }).then(() => {
-    getList();
-    proxy.$modal.msgSuccess("删除成功");
-  }).catch(() => {});
-}
-
-/** 清理过期日志 */
-function handleCleanExpired() {
-  cleanOpen.value = true;
-}
-
-/** 确认清理过期日志 */
-function confirmCleanExpired() {
-  proxy.$modal.confirm(`确认删除${cleanForm.value.days}天前的所有日志吗？此操作不可恢复！`).then(function() {
-    return cleanExpiredLogs(cleanForm.value.days);
-  }).then(() => {
-    cleanOpen.value = false;
-    getList();
-    proxy.$modal.msgSuccess("清理成功");
-  }).catch(() => {});
+  detailForm.value = row;
+  detailOpen.value = true;
 }
 
 /** 统计分析 */
@@ -442,9 +354,6 @@ function getStatisticsData() {
 // 初始化查询参数
 onMounted(() => {
   const route = proxy.$route;
-  if (route.query.scheduleId) {
-    queryParams.value.scheduleId = route.query.scheduleId;
-  }
   if (route.query.workflowId) {
     queryParams.value.workflowId = route.query.workflowId;
   }
