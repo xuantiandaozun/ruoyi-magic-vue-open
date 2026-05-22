@@ -692,16 +692,9 @@ async function handleAiCover(row) {
   row.aiCoverLoading = true;
   
   try {
-    proxy.$modal.msgSuccess('AI封面生成任务已提交，请稍候...');
-    
-    // 调用封装好的API
-    const response = await generateBlogCover(row.blogId);
-    
-    if (response.code === 200) {
-      proxy.$modal.msgSuccess(response.msg || 'AI封面生成任务已提交，后台生成完成后会自动更新封面');
-    } else {
-      proxy.$modal.msgError(response.msg || 'AI封面生成失败');
-    }
+    // 调用封装好的API，拦截器已处理非200情况
+    await generateBlogCover(row.blogId);
+    proxy.$modal.msgSuccess('AI封面生成任务已提交，后台生成完成后会自动更新封面');
   } catch (error) {
     proxy.$modal.msgError('AI封面生成失败：' + (error.message || error));
   } finally {
