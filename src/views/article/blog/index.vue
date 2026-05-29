@@ -137,8 +137,9 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="360">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="460">
         <template #default="scope">
+          <el-button link type="warning" icon="Promotion" @click="handleSyncWechat(scope.row)" v-hasPermi="['article:blog:edit']" :loading="scope.row.wechatSyncLoading">公众号</el-button>
           <el-button link type="primary" icon="Picture" @click="handleSetCover(scope.row)" v-hasPermi="['article:blog:edit']">设置封面</el-button>
           <el-button link type="success" icon="MagicStick" @click="handleAiCover(scope.row)" v-hasPermi="['article:blog:edit']" :loading="scope.row.aiCoverLoading">AI封面</el-button>
           <el-button link type="primary" icon="Edit" @click="handleUpdate(scope.row)" v-hasPermi="['article:blog:edit']">修改</el-button>
@@ -282,7 +283,7 @@
 <script setup name="Blog">
 import { listUnusedRecords } from "@/api/ai/coverGenerationRecord";
 import { generateBlogCover } from "@/api/ai/workflowApi";
-import { addBlog, delBlog, generateAiImage, getBlog, getFeishuDocOptions, listBlog, updateBlog } from "@/api/article/blog";
+import { addBlog, delBlog, generateAiImage, getBlog, getFeishuDocOptions, listBlog, syncWechatDraft, updateBlog } from "@/api/article/blog";
 import { getEnBlogByZhBlogId, updateEnBlog } from "@/api/article/enBlog";
 import { getCurrentInstance, onMounted, onUnmounted, reactive, ref, toRefs, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -523,6 +524,29 @@ async function submitForm() {
     proxy.$modal.msgError("操作失败：" + error);
   } finally {
     formLoading.value = false;
+  }
+}
+
+/** 同步到微信公众号草稿箱 */
+async function handleSyncWechat(row) {
+  if (!row.coverImage) {
+    proxy.$modal.msgWarning("请先设置封面图片后再同步到公众号");
+    return;
+  }
+  try {
+    await proxy.$modal.confirm(`确认将《${row.title}》同步到微信公众号草稿箱？`);
+    row.wechatSyncLoading = true;
+    const response = await syncWechatDraft(row.blogId);
+    const data = response.data || {};
+    proxy.$modal.msgSuccess(
+      `同步成功。草稿 media_id：${data.draftMediaId || '-'}`
+    );
+  } catch (error) {
+    if (error !== 'cancel') {
+      proxy.$modal.msgError("同步失败：" + (error.message || error));
+    }
+  } finally {
+    row.wechatSyncLoading = false;
   }
 }
 

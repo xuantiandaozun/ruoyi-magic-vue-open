@@ -58,3 +58,12 @@ export function generateAiImage() {
     method: 'post'
   })
 }
+
+// 同步到微信公众号草稿箱
+export function syncWechatDraft(blogId) {
+  return request({
+    url: '/article/blog/syncWechatDraft/' + blogId,
+    method: 'post',
+    timeout: 180000
+  })
+}
