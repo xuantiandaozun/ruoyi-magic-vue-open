@@ -16,6 +16,14 @@ export function executeWorkflowSchedule(workflowId, scheduleId) {
   })
 }
 
+// 释放卡住的工作流锁
+export function unlockWorkflowSchedule(workflowId) {
+  return request({
+    url: `/ai/workflow/${workflowId}/schedules/unlock`,
+    method: 'put'
+  })
+}
+
 // 获取工作流定时调度统计信息
 export function getWorkflowScheduleStatistics(workflowId) {
   return request({

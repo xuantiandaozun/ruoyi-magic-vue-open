@@ -194,9 +194,10 @@
               {{ parseTime(scope.row.lastExecutionTime) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" width="180">
+          <el-table-column label="操作" align="center" width="260">
             <template #default="scope">
               <el-button link type="primary" icon="CaretRight" @click="handleExecuteSchedule(scope.row)" v-hasPermi="['ai:workflow:schedule:execute']">立即执行</el-button>
+              <el-button link type="warning" icon="Unlock" @click="handleUnlockSchedule" v-hasPermi="['ai:workflow:schedule:execute']">释放锁</el-button>
               <el-button link type="info" icon="Document" @click="handleViewScheduleLogs(scope.row)" v-hasPermi="['ai:workflow:schedule:log:list']">日志</el-button>
             </template>
           </el-table-column>
@@ -255,7 +256,7 @@
 
 <script setup name="AiWorkflow">
 import { listWorkflows, getWorkflow } from "@/api/ai/workflow";
-import { getWorkflowSchedules, executeWorkflowSchedule, getWorkflowScheduleStatistics } from "@/api/ai/workflowSchedule";
+import { getWorkflowSchedules, executeWorkflowSchedule, unlockWorkflowSchedule, getWorkflowScheduleStatistics } from "@/api/ai/workflowSchedule";
 
 const { proxy } = getCurrentInstance();
 const { sys_normal_disable } = proxy.useDict('sys_normal_disable');
@@ -378,7 +379,20 @@ function handleExecuteSchedule(row) {
   executeWorkflowSchedule(currentWorkflow.value.id, row.id).then(() => {
     proxy.$modal.msgSuccess("执行成功");
     getScheduleList();
+    getScheduleStats();
   });
+}
+
+/** 释放卡住的工作流锁 */
+function handleUnlockSchedule() {
+  proxy.$modal.confirm('确认释放该工作流的执行锁，并结束卡住的运行中日志？').then(() => {
+    return unlockWorkflowSchedule(currentWorkflow.value.id);
+  }).then((response) => {
+    const data = response.data || {};
+    proxy.$modal.msgSuccess(`释放完成：清理锁=${data.lockReleased ? '是' : '否'}，结束日志=${data.failedRunningLogs || 0}条`);
+    getScheduleStats();
+    getScheduleList();
+  }).catch(() => {});
 }
 
 /** 关闭定时任务管理对话框 */

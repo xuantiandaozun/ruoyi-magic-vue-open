@@ -4,8 +4,8 @@
     <template v-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.alwaysShow">
       <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild.path, onlyOneChild.query)">
         <el-menu-item :index="resolvePath(onlyOneChild.path)" :class="{ 'submenu-title-noDropdown': !isNest }">
-          <!-- 菜单图标 -->
-          <svg-icon :icon-class="onlyOneChild.meta.icon || (item.meta && item.meta.icon)"/>
+          <!-- 仅一级菜单显示图标 -->
+          <svg-icon v-if="!isNest && hasMenuIcon(onlyOneChild.meta?.icon || item.meta?.icon)" :icon-class="onlyOneChild.meta.icon || (item.meta && item.meta.icon)"/>
           <!-- 菜单标题 -->
           <template #title><span class="menu-title" :title="onlyOneChild.meta.title">{{ onlyOneChild.meta.title }}</span></template>
         </el-menu-item>
@@ -15,8 +15,8 @@
     <!-- 处理有多个子路由的情况，显示为子菜单 -->
     <el-sub-menu v-else ref="subMenu" :index="resolvePath(item.path)" teleported>
       <template v-if="item.meta" #title>
-        <!-- 子菜单标题图标 -->
-        <svg-icon :icon-class="item.meta && item.meta.icon" />
+        <!-- 仅一级菜单显示图标 -->
+        <svg-icon v-if="!isNest && hasMenuIcon(item.meta?.icon)" :icon-class="item.meta.icon" />
         <!-- 子菜单标题文本 -->
         <span class="menu-title" :title="item.meta.title">{{ item.meta.title }}</span>
       </template>
@@ -60,6 +60,15 @@ const props = defineProps({
 
 // 存储唯一子路由
 const onlyOneChild = ref({});
+
+/**
+ * 判断菜单项是否配置了有效图标
+ * @param {String} icon 图标名称
+ * @returns {Boolean}
+ */
+function hasMenuIcon(icon) {
+  return !!icon && icon !== '#'
+}
 
 /**
  * 判断是否只有一个显示的子路由
